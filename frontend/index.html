@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech-to-Text App</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>Speech-to-Text</h1>
+            <p class="subtitle">Powered by NVIDIA Parakeet</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Recording Section -->
+            <section class="recording-section">
+                <button id="recordButton" class="record-button" aria-label="Record audio">
+                    <svg class="mic-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+
+                <div id="statusIndicator" class="status-indicator">
+                    <span id="statusText">Click to Record</span>
+                </div>
+
+                <div id="recordingIndicator" class="recording-indicator hidden">
+                    <span class="pulse-dot"></span>
+                    <span>Recording...</span>
+                </div>
+
+                <div id="processingIndicator" class="processing-indicator hidden">
+                    <div class="spinner"></div>
+                    <span>Transcribing...</span>
+                </div>
+            </section>
+
+            <!-- Transcription Display -->
+            <section class="transcription-section">
+                <div class="transcription-header">
+                    <h2>Transcription</h2>
+                    <div class="transcription-actions">
+                        <button id="copyButton" class="action-button hidden" title="Copy to clipboard">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 4v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.242a2 2 0 0 0-.602-1.43L16.083 2.57A2 2 0 0 0 14.685 2H10a2 2 0 0 0-2 2z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M16 18v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                            Copy
+                        </button>
+                        <button id="downloadButton" class="action-button hidden" title="Download as text file">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Download
+                        </button>
+                    </div>
+                </div>
+
+                <div id="transcriptionOutput" class="transcription-output">
+                    <p class="placeholder-text">Your transcribed text will appear here...</p>
+                </div>
+
+                <div id="transcriptionMeta" class="transcription-meta hidden">
+                    <span id="languageInfo" class="meta-item"></span>
+                    <span id="durationInfo" class="meta-item"></span>
+                </div>
+            </section>
+
+            <!-- Error Display -->
+            <div id="errorMessage" class="error-message hidden">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span id="errorText"></span>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Supports 25 European languages • Auto-detects language • Up to 24 minutes</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# FastAPI and server
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Audio processing
+librosa
+soundfile
+
+# NVIDIA NeMo toolkit for ASR
+# Note: Install PyTorch first, then NeMo
+nemo_toolkit[asr]
