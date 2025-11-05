@@ -1,0 +1,11 @@
+<Window x:Class="SpeechToTextTray.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Speech-to-Text"
+        Height="0"
+        Width="0"
+        ShowInTaskbar="False"
+        Visibility="Hidden"
+        WindowStyle="None">
+    <!-- This window is hidden and only exists to support the application infrastructure -->
+</Window>

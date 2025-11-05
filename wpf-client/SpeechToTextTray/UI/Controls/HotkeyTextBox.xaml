@@ -1,0 +1,17 @@
+<UserControl x:Class="SpeechToTextTray.UI.Controls.HotkeyTextBox"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="30" d:DesignWidth="200">
+    <TextBox x:Name="txtHotkey"
+             IsReadOnly="True"
+             PreviewKeyDown="TxtHotkey_PreviewKeyDown"
+             GotFocus="TxtHotkey_GotFocus"
+             LostFocus="TxtHotkey_LostFocus"
+             Text="{Binding HotkeyText, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
+             Background="#F5F5F5"
+             Padding="5"
+             VerticalContentAlignment="Center"/>
+</UserControl>

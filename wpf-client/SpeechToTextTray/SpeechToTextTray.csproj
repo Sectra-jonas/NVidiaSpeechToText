@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Resources\Icons\app.ico</ApplicationIcon>
+    <AssemblyName>SpeechToTextTray</AssemblyName>
+    <Product>Speech-to-Text Tray</Product>
+    <Version>1.0.0</Version>
+    <Authors>Your Name</Authors>
+    <Company>Your Company</Company>
+    <Description>Windows tray application for speech-to-text transcription using NVIDIA Parakeet model</Description>
+    <Copyright>Copyright © 2025</Copyright>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- System Tray Icon -->
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
+
+    <!-- Global Hotkeys -->
+    <PackageReference Include="NHotkey.Wpf" Version="2.1.0" />
+
+    <!-- Audio Recording -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
+
+    <!-- HTTP Client & JSON (built-in, but include for clarity) -->
+    <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Include icon resources -->
+    <Resource Include="Resources\Icons\*.ico" />
+    <Resource Include="Resources\Icons\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Create folders for resources if they don't exist -->
+    <Folder Include="Resources\Sounds\" />
+  </ItemGroup>
+
+</Project>
