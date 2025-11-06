@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:SpeechToTextTray.UI.Controls"
         Title="Speech-to-Text Settings"
-        Height="500" Width="550"
+        Height="600" Width="550"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         Background="#F0F0F0">
@@ -64,6 +64,11 @@
                 <RadioButton x:Name="azureProviderRadio"
                              GroupName="TranscriptionProvider"
                              Content="Azure Speech Service (Cloud)"
+                             Margin="0,0,0,5"
+                             Checked="OnProviderChanged"/>
+                <RadioButton x:Name="azureOpenAIProviderRadio"
+                             GroupName="TranscriptionProvider"
+                             Content="Azure OpenAI Whisper (Cloud)"
                              Margin="0,0,0,10"
                              Checked="OnProviderChanged"/>
 
@@ -156,6 +161,113 @@
                                    Margin="0,10,0,0">
                             <Run Text="Azure Speech Service requires internet. "/>
                             <Hyperlink NavigateUri="https://azure.microsoft.com/services/cognitive-services/speech-services/" RequestNavigate="Hyperlink_RequestNavigate">Get started</Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- Azure OpenAI Configuration Panel -->
+                <Border x:Name="azureOpenAIConfigPanel"
+                        Visibility="Collapsed"
+                        BorderBrush="#CCCCCC"
+                        BorderThickness="1"
+                        Padding="15"
+                        Margin="0,0,0,0"
+                        Background="White">
+                    <StackPanel>
+                        <TextBlock Text="Azure OpenAI Configuration" FontWeight="Bold" FontSize="12" Margin="0,0,0,10"/>
+
+                        <!-- Endpoint URL -->
+                        <Label Content="Endpoint URL:" Margin="0,5,0,5"/>
+                        <TextBox x:Name="azureOpenAIEndpointInput"
+                                 Height="30"
+                                 Padding="5"/>
+                        <TextBlock Text="Example: https://your-resource.openai.azure.com/"
+                                   Foreground="Gray"
+                                   FontSize="10"
+                                   Margin="0,3,0,0"/>
+
+                        <!-- API Key -->
+                        <Label Content="API Key:" Margin="0,10,0,5"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <PasswordBox x:Name="azureOpenAIKeyInput"
+                                         Grid.Column="0"
+                                         Height="30"
+                                         Padding="5"/>
+                            <Button x:Name="testOpenAIConnectionButton"
+                                    Content="Test"
+                                    Grid.Column="1"
+                                    Width="60"
+                                    Height="30"
+                                    Margin="5,0,0,0"
+                                    Click="TestAzureOpenAIConnection_Click"/>
+                        </Grid>
+                        <TextBlock Text="Your Azure OpenAI API key"
+                                   Foreground="Gray"
+                                   FontSize="10"
+                                   Margin="0,3,0,0"/>
+
+                        <!-- Deployment Name -->
+                        <Label Content="Deployment Name:" Margin="0,10,0,5"/>
+                        <TextBox x:Name="azureOpenAIDeploymentInput"
+                                 Height="30"
+                                 Padding="5"/>
+                        <TextBlock Text="The name of your Whisper deployment in Azure OpenAI Studio"
+                                   Foreground="Gray"
+                                   FontSize="10"
+                                   Margin="0,3,0,0"/>
+
+                        <!-- Language (Optional) -->
+                        <Label Content="Language (optional):" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="azureOpenAILanguageCombo" Height="30">
+                            <ComboBoxItem Content="Auto-detect" Tag="" IsSelected="True"/>
+                            <ComboBoxItem Content="English" Tag="en"/>
+                            <ComboBoxItem Content="German" Tag="de"/>
+                            <ComboBoxItem Content="French" Tag="fr"/>
+                            <ComboBoxItem Content="Spanish" Tag="es"/>
+                            <ComboBoxItem Content="Italian" Tag="it"/>
+                            <ComboBoxItem Content="Portuguese" Tag="pt"/>
+                            <ComboBoxItem Content="Dutch" Tag="nl"/>
+                            <ComboBoxItem Content="Polish" Tag="pl"/>
+                            <ComboBoxItem Content="Russian" Tag="ru"/>
+                            <ComboBoxItem Content="Chinese" Tag="zh"/>
+                            <ComboBoxItem Content="Japanese" Tag="ja"/>
+                        </ComboBox>
+                        <TextBlock Text="Leave as Auto-detect for automatic language recognition"
+                                   Foreground="Gray"
+                                   FontSize="10"
+                                   Margin="0,3,0,0"/>
+
+                        <!-- Prompt (Optional) -->
+                        <Label Content="Prompt (optional):" Margin="0,10,0,5"/>
+                        <TextBox x:Name="azureOpenAIPromptInput"
+                                 Height="30"
+                                 Padding="5"/>
+                        <TextBlock Text="Optional text to guide transcription (improves accuracy for specific terminology)"
+                                   Foreground="Gray"
+                                   FontSize="10"
+                                   Margin="0,3,0,0"/>
+
+                        <!-- Status Indicator -->
+                        <StackPanel Orientation="Horizontal" Margin="0,15,0,5">
+                            <Ellipse x:Name="azureOpenAIStatusIndicator"
+                                     Width="10" Height="10"
+                                     Fill="Gray"
+                                     Margin="0,0,5,0"/>
+                            <TextBlock x:Name="azureOpenAIStatusText" Text="Not tested" FontSize="11"/>
+                        </StackPanel>
+
+                        <!-- Help Text -->
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="#666666"
+                                   FontSize="10"
+                                   Margin="0,10,0,0">
+                            <Run Text="Azure OpenAI Whisper requires internet. 25MB file size limit. "/>
+                            <Hyperlink NavigateUri="https://learn.microsoft.com/en-us/azure/ai-services/openai/whisper-quickstart" RequestNavigate="Hyperlink_RequestNavigate">Get started</Hyperlink>
                         </TextBlock>
                     </StackPanel>
                 </Border>

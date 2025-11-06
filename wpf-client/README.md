@@ -14,8 +14,9 @@ A Windows 11 system tray application for real-time speech-to-text transcription 
 - 🔌 **Multi-Provider Support**: Choose your transcription provider
   - **Local (Default)**: Offline ONNX transcription using sherpa-onnx, 25 European languages, no internet required
   - **Azure Speech Service**: Cloud-based recognition, 100+ languages with auto-detection, requires subscription
+  - **Azure OpenAI Whisper**: OpenAI's Whisper model on Azure, excellent English transcription, 50+ languages with translation to English
 - ⚙️ **CPU-Only (Local)**: Local provider works on all Windows machines without GPU requirements
-- 🔮 **Extensible**: Easy to add future providers (Google Cloud, AWS, OpenAI Whisper)
+- 🔮 **Extensible**: Easy to add future providers (Google Cloud, AWS)
 
 ## Prerequisites
 
@@ -142,7 +143,7 @@ Settings are stored in: `%APPDATA%\SpeechToTextTray\settings.json`
 
 ### Configuring Transcription Provider
 
-The application supports two transcription providers:
+The application supports three transcription providers:
 
 #### Local Provider (Default)
 - **No configuration required** - works out of the box
@@ -172,6 +173,37 @@ The application supports two transcription providers:
 
 **Note**: Azure Speech Service may incur costs based on usage. Check Azure pricing for details.
 
+#### Azure OpenAI Whisper Provider
+1. **Get Azure OpenAI Access**:
+   - Visit [Azure OpenAI Service](https://azure.microsoft.com/products/ai-services/openai-service/)
+   - Create an Azure OpenAI resource in Azure Portal
+   - Deploy a Whisper model in Azure OpenAI Studio
+   - Copy your endpoint URL, API key, and deployment name
+
+2. **Configure in Settings**:
+   - Open Settings window (right-click tray icon → Settings)
+   - Select "Azure OpenAI Whisper (Cloud)" provider
+   - Enter your endpoint URL (e.g., https://your-resource.openai.azure.com/)
+   - Enter your API key
+   - Enter your deployment name (from Azure OpenAI Studio)
+   - (Optional) Select a specific language or leave as "Auto-detect"
+   - (Optional) Enter a prompt to guide transcription
+   - Click "Test" to verify connection
+   - Click "Save"
+
+3. **Requirements**:
+   - Active internet connection
+   - Valid Azure OpenAI API key and endpoint
+   - Deployed Whisper model in Azure OpenAI
+   - Audio files must be under 25MB
+
+4. **Advantages**:
+   - Excellent transcription quality for English
+   - Supports 50+ languages with translation to English
+   - Can use prompt to improve accuracy for specific terminology
+
+**Note**: Azure OpenAI may incur costs based on usage. Check Azure OpenAI pricing for details.
+
 ## Architecture
 
 ### Project Structure
@@ -180,7 +212,12 @@ The application supports two transcription providers:
 SpeechToTextTray/
 ├── Core/
 │   ├── Services/           # Core business logic
-│   │   ├── LocalTranscriptionService.cs   (sherpa-onnx ONNX Runtime)
+│   │   ├── Transcription/
+│   │   │   ├── ITranscriptionService.cs           (Interface for all providers)
+│   │   │   ├── LocalTranscriptionService.cs       (sherpa-onnx ONNX Runtime)
+│   │   │   ├── AzureTranscriptionService.cs       (Azure Speech SDK)
+│   │   │   ├── AzureOpenAITranscriptionService.cs (Azure OpenAI Whisper)
+│   │   │   └── TranscriptionServiceFactory.cs     (Provider factory)
 │   │   ├── AudioRecordingService.cs       (NAudio integration)
 │   │   ├── TextInjectionService.cs        (Win32 SendInput API)
 │   │   ├── GlobalHotkeyService.cs         (Hotkey registration)
@@ -218,6 +255,8 @@ SpeechToTextTray/
 
 - **WPF (.NET 8.0)**: UI framework
 - **sherpa-onnx (1.12.15)**: ONNX Runtime for local speech recognition
+- **Azure.AI.OpenAI (2.1.0)**: Azure OpenAI Whisper client library
+- **Microsoft.CognitiveServices.Speech (1.43.0)**: Azure Speech Service SDK
 - **Hardcodet.NotifyIcon.Wpf**: System tray functionality
 - **NHotkey.Wpf**: Global hotkey registration (no admin required)
 - **NAudio (2.2.1)**: Audio capture from Windows devices
@@ -392,6 +431,8 @@ For issues, questions, or feature requests:
 
 - **NVIDIA NeMo & Parakeet**: ASR model
 - **sherpa-onnx (Next-gen Kaldi)**: ONNX Runtime framework
+- **Azure OpenAI Whisper**: OpenAI's speech recognition model on Azure
+- **Azure Speech Service**: Microsoft's cloud speech recognition
 - **NAudio**: Audio recording library
 - **Hardcodet.NotifyIcon.Wpf**: System tray functionality
 - **NHotkey**: Global hotkey registration

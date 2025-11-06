@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using SpeechToTextTray.Core.Helpers;
 using SpeechToTextTray.Core.Models;
@@ -99,8 +100,36 @@ namespace SpeechToTextTray
             }
 
             // Initialize audio device (pre-opens device to eliminate capture delay)
-            _audioService.Initialize(_settings.AudioDeviceId);
-            Logger.Info($"Audio device initialized: {_settings.AudioDeviceId}");
+            string actualDeviceId = _audioService.Initialize(_settings.AudioDeviceId);
+
+            // Check if fallback occurred
+            if (actualDeviceId != _settings.AudioDeviceId)
+            {
+                Logger.Warning($"Configured audio device '{_settings.AudioDeviceId}' not available. Using device '{actualDeviceId}' instead.");
+
+                // Update settings with actual device
+                _settings.AudioDeviceId = actualDeviceId;
+                _settingsService.SaveSettings(_settings);
+
+                // Get device name for user notification
+                var devices = _audioService.GetAvailableDevices();
+                var actualDevice = devices.FirstOrDefault(d => d.Id == actualDeviceId);
+                string deviceName = actualDevice?.Name ?? $"Device {actualDeviceId}";
+
+                // Notify user after tray icon is initialized (we'll do this after InitializeTrayIcon)
+                System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        _trayIcon?.ShowNotification(
+                            "Audio Device Changed",
+                            $"The previously configured audio device is no longer available. Using: {deviceName}",
+                            Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
+                    });
+                });
+            }
+
+            Logger.Info($"Audio device initialized: {actualDeviceId}");
 
             // Subscribe to hotkey events
             _hotkeyService.HotkeyPressed += OnHotkeyPressed;
@@ -242,10 +271,44 @@ namespace SpeechToTextTray
                 Logger.Info($"Transcribing audio using {providerInfo.ProviderName}...");
                 var result = await _transcriptionService.TranscribeAsync(_currentRecordingPath);
 
-                Logger.Info($"Transcription received: {result.Text.Length} characters, Language: {result.Language}");
+                // Check if transcription was successful
+                if (!result.Success)
+                {
+                    // Transcription failed
+                    string errorMessage = result.ErrorMessage ?? "Unknown error occurred during transcription";
+                    Logger.Error($"Transcription failed: {errorMessage}");
+
+                    // Log exception details if available
+                    if (result.Exception != null)
+                    {
+                        Logger.Error("Transcription exception details:", result.Exception);
+                    }
+
+                    // Notify user of failure
+                    _trayIcon?.ShowNotification(
+                        "Transcription Failed",
+                        errorMessage,
+                        Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+
+                    return; // Exit early, don't try to inject text
+                }
+
+                // Transcription succeeded
+                Logger.Info($"Transcription successful: {result.Text.Length} characters, Language: {result.Language}");
+
+                // Check if we got any text
+                if (string.IsNullOrWhiteSpace(result.Text))
+                {
+                    Logger.Warning("Transcription returned empty text (no speech detected)");
+                    _trayIcon?.ShowNotification(
+                        "No Speech Detected",
+                        "The transcription service did not detect any speech in the recording.",
+                        Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
+                    return; // Exit early, nothing to inject
+                }
 
                 // Inject text
-                if (_settings.InjectTextAutomatically && !string.IsNullOrWhiteSpace(result.Text))
+                if (_settings.InjectTextAutomatically)
                 {
                     _currentState = RecordingState.Injecting;
                     _trayIcon?.SetState(RecordingState.Injecting);
@@ -332,8 +395,29 @@ namespace SpeechToTextTray
             RegisterHotkey();
 
             // Update audio device if changed
-            _audioService.ChangeDevice(_settings.AudioDeviceId);
-            Logger.Info($"Audio device updated: {_settings.AudioDeviceId}");
+            string actualDeviceId = _audioService.ChangeDevice(_settings.AudioDeviceId);
+
+            // Check if fallback occurred
+            if (actualDeviceId != _settings.AudioDeviceId)
+            {
+                Logger.Warning($"Requested audio device '{_settings.AudioDeviceId}' not available. Using device '{actualDeviceId}' instead.");
+
+                // Update settings with actual device
+                _settings.AudioDeviceId = actualDeviceId;
+                _settingsService.SaveSettings(_settings);
+
+                // Get device name for user notification
+                var devices = _audioService.GetAvailableDevices();
+                var actualDevice = devices.FirstOrDefault(d => d.Id == actualDeviceId);
+                string deviceName = actualDevice?.Name ?? $"Device {actualDeviceId}";
+
+                _trayIcon?.ShowNotification(
+                    "Audio Device Changed",
+                    $"The selected audio device is no longer available. Using: {deviceName}",
+                    Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
+            }
+
+            Logger.Info($"Audio device updated: {actualDeviceId}");
 
             // Update text injection service
             _textInjection = new TextInjectionService(_settings.FallbackToClipboard);

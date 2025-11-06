@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <!-- System Tray Icon -->
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
 
     <!-- Global Hotkeys -->

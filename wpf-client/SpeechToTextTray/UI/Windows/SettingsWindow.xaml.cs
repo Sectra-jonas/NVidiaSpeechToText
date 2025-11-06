@@ -71,6 +71,11 @@ namespace SpeechToTextTray.UI.Windows
                 azureProviderRadio.IsChecked = true;
                 LoadAzureSettings(_currentSettings.Transcription.Azure);
             }
+            else if (_selectedProvider == TranscriptionProvider.AzureOpenAI)
+            {
+                azureOpenAIProviderRadio.IsChecked = true;
+                LoadAzureOpenAISettings(_currentSettings.Transcription.AzureOpenAI);
+            }
 
             UpdateProviderPanelVisibility();
         }
@@ -108,6 +113,40 @@ namespace SpeechToTextTray.UI.Windows
             {
                 azureLanguageCombo.SelectedIndex = 0; // Auto-detect
             }
+        }
+
+        private void LoadAzureOpenAISettings(AzureOpenAITranscriptionConfig config)
+        {
+            if (config == null) return;
+
+            // Set endpoint
+            azureOpenAIEndpointInput.Text = config.Endpoint;
+
+            // Set API key (PasswordBox doesn't have a binding-friendly property)
+            azureOpenAIKeyInput.Password = config.ApiKey;
+
+            // Set deployment name
+            azureOpenAIDeploymentInput.Text = config.DeploymentName;
+
+            // Select language
+            if (!string.IsNullOrEmpty(config.Language))
+            {
+                foreach (ComboBoxItem item in azureOpenAILanguageCombo.Items)
+                {
+                    if (item.Tag?.ToString() == config.Language)
+                    {
+                        azureOpenAILanguageCombo.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                azureOpenAILanguageCombo.SelectedIndex = 0; // Auto-detect
+            }
+
+            // Set prompt (optional)
+            azureOpenAIPromptInput.Text = config.Prompt ?? "";
         }
 
         private void LoadAudioDevices()
@@ -177,7 +216,10 @@ namespace SpeechToTextTray.UI.Windows
                         Local = _currentSettings.Transcription.Local, // Keep existing local config
                         Azure = _selectedProvider == TranscriptionProvider.Azure
                             ? CreateAzureConfigFromUI()
-                            : _currentSettings.Transcription.Azure
+                            : _currentSettings.Transcription.Azure,
+                        AzureOpenAI = _selectedProvider == TranscriptionProvider.AzureOpenAI
+                            ? CreateAzureOpenAIConfigFromUI()
+                            : _currentSettings.Transcription.AzureOpenAI
                     }
                 };
 
@@ -243,6 +285,10 @@ namespace SpeechToTextTray.UI.Windows
             {
                 _selectedProvider = TranscriptionProvider.Azure;
             }
+            else if (azureOpenAIProviderRadio.IsChecked == true)
+            {
+                _selectedProvider = TranscriptionProvider.AzureOpenAI;
+            }
 
             UpdateProviderPanelVisibility();
         }
@@ -252,6 +298,13 @@ namespace SpeechToTextTray.UI.Windows
             if (azureConfigPanel != null)
             {
                 azureConfigPanel.Visibility = _selectedProvider == TranscriptionProvider.Azure
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (azureOpenAIConfigPanel != null)
+            {
+                azureOpenAIConfigPanel.Visibility = _selectedProvider == TranscriptionProvider.AzureOpenAI
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
@@ -338,6 +391,92 @@ namespace SpeechToTextTray.UI.Windows
                 Region = (azureRegionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "eastus",
                 Language = string.IsNullOrWhiteSpace(language) ? null : language
             };
+        }
+
+        private AzureOpenAITranscriptionConfig CreateAzureOpenAIConfigFromUI()
+        {
+            var language = (azureOpenAILanguageCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+            var prompt = azureOpenAIPromptInput.Text.Trim();
+
+            return new AzureOpenAITranscriptionConfig
+            {
+                Endpoint = azureOpenAIEndpointInput.Text.Trim(),
+                ApiKey = azureOpenAIKeyInput.Password.Trim(),
+                DeploymentName = azureOpenAIDeploymentInput.Text.Trim(),
+                Language = string.IsNullOrWhiteSpace(language) ? null : language,
+                Prompt = string.IsNullOrWhiteSpace(prompt) ? null : prompt
+            };
+        }
+
+        private async void TestAzureOpenAIConnection_Click(object sender, RoutedEventArgs e)
+        {
+            // Disable button during test
+            testOpenAIConnectionButton.IsEnabled = false;
+            azureOpenAIStatusText.Text = "Testing...";
+            azureOpenAIStatusIndicator.Fill = new SolidColorBrush(Colors.Orange);
+
+            try
+            {
+                var testConfig = CreateAzureOpenAIConfigFromUI();
+
+                // Validate configuration first
+                var validation = TranscriptionServiceFactory.ValidateConfiguration(
+                    new TranscriptionConfig { Provider = TranscriptionProvider.AzureOpenAI, AzureOpenAI = testConfig });
+
+                if (!validation.IsValid)
+                {
+                    azureOpenAIStatusText.Text = "Configuration invalid";
+                    azureOpenAIStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                    MessageBox.Show(
+                        $"Configuration invalid:\n\n{validation.ErrorMessage}",
+                        "Validation Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Try to create service
+                using (var testService = new AzureOpenAITranscriptionService(testConfig))
+                {
+                    var serviceValidation = await testService.ValidateConfigurationAsync();
+
+                    if (serviceValidation.IsValid)
+                    {
+                        azureOpenAIStatusText.Text = "Connection successful";
+                        azureOpenAIStatusIndicator.Fill = new SolidColorBrush(Colors.Green);
+                        MessageBox.Show(
+                            "Azure OpenAI Whisper connection successful!",
+                            "Test Connection",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        azureOpenAIStatusText.Text = "Connection failed";
+                        azureOpenAIStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                        MessageBox.Show(
+                            $"Connection failed:\n\n{serviceValidation.ErrorMessage}",
+                            "Test Connection",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Azure OpenAI connection test failed", ex);
+                azureOpenAIStatusText.Text = "Test failed";
+                azureOpenAIStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                MessageBox.Show(
+                    $"Test failed:\n\n{ex.Message}",
+                    "Test Connection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                testOpenAIConnectionButton.IsEnabled = true;
+            }
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

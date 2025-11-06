@@ -75,30 +75,82 @@ namespace SpeechToTextTray.Core.Services
         /// <summary>
         /// Initialize audio device for recording. Call this once at startup.
         /// Pre-opens the audio device to eliminate startup delay.
+        /// If the requested device is not available, falls back to the default device.
         /// </summary>
         /// <param name="deviceId">Device ID (from AudioDevice.Id), or null for default</param>
-        public void Initialize(string deviceId)
+        /// <returns>The actual device ID that was initialized (may differ from requested if fallback occurred)</returns>
+        public string Initialize(string deviceId)
         {
             _currentDeviceId = deviceId ?? "default";
-            InitializeWaveIn(_currentDeviceId);
+
+            try
+            {
+                InitializeWaveIn(_currentDeviceId);
+                return _currentDeviceId;
+            }
+            catch (ArgumentException ex)
+            {
+                // Device not available - log warning and fall back to default
+                System.Diagnostics.Debug.WriteLine($"Requested audio device '{deviceId}' not available: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine("Falling back to default audio device");
+
+                // Try default device (0)
+                if (WaveInEvent.DeviceCount > 0)
+                {
+                    _currentDeviceId = "0";
+                    InitializeWaveIn(_currentDeviceId);
+                    return _currentDeviceId;
+                }
+                else
+                {
+                    // No audio devices available at all
+                    throw new InvalidOperationException("No audio input devices available on this system", ex);
+                }
+            }
         }
 
         /// <summary>
         /// Change the audio device. Disposes the current device and initializes the new one.
+        /// If the requested device is not available, falls back to the default device.
         /// </summary>
         /// <param name="deviceId">Device ID (from AudioDevice.Id), or null for default</param>
-        public void ChangeDevice(string deviceId)
+        /// <returns>The actual device ID that was initialized (may differ from requested if fallback occurred)</returns>
+        public string ChangeDevice(string deviceId)
         {
             string newDeviceId = deviceId ?? "default";
             if (_currentDeviceId == newDeviceId)
-                return;
+                return _currentDeviceId;
 
             if (IsRecording)
                 throw new InvalidOperationException("Cannot change device while recording");
 
             DisposeWaveIn();
             _currentDeviceId = newDeviceId;
-            InitializeWaveIn(_currentDeviceId);
+
+            try
+            {
+                InitializeWaveIn(_currentDeviceId);
+                return _currentDeviceId;
+            }
+            catch (ArgumentException ex)
+            {
+                // Device not available - log warning and fall back to default
+                System.Diagnostics.Debug.WriteLine($"Requested audio device '{deviceId}' not available: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine("Falling back to default audio device");
+
+                // Try default device (0)
+                if (WaveInEvent.DeviceCount > 0)
+                {
+                    _currentDeviceId = "0";
+                    InitializeWaveIn(_currentDeviceId);
+                    return _currentDeviceId;
+                }
+                else
+                {
+                    // No audio devices available at all
+                    throw new InvalidOperationException("No audio input devices available on this system", ex);
+                }
+            }
         }
 
         /// <summary>

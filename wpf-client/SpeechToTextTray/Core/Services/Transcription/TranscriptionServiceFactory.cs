@@ -30,6 +30,7 @@ namespace SpeechToTextTray.Core.Services.Transcription
                 {
                     TranscriptionProvider.Local => CreateLocalService(config.Local),
                     TranscriptionProvider.Azure => CreateAzureService(config.Azure),
+                    TranscriptionProvider.AzureOpenAI => CreateAzureOpenAIService(config.AzureOpenAI),
                     _ => throw new NotSupportedException($"Provider {config.Provider} is not supported")
                 };
             }
@@ -80,6 +81,33 @@ namespace SpeechToTextTray.Core.Services.Transcription
         }
 
         /// <summary>
+        /// Create Azure OpenAI transcription service
+        /// </summary>
+        private static ITranscriptionService CreateAzureOpenAIService(AzureOpenAITranscriptionConfig config)
+        {
+            if (config == null)
+                throw new InvalidOperationException("Azure OpenAI configuration is missing");
+
+            if (string.IsNullOrWhiteSpace(config.Endpoint))
+                throw new InvalidOperationException("Azure OpenAI endpoint is required");
+
+            if (string.IsNullOrWhiteSpace(config.ApiKey))
+                throw new InvalidOperationException("Azure OpenAI API key is required");
+
+            if (string.IsNullOrWhiteSpace(config.DeploymentName))
+                throw new InvalidOperationException("Azure OpenAI deployment name is required");
+
+            try
+            {
+                return new AzureOpenAITranscriptionService(config);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to initialize Azure OpenAI transcription service: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         /// Validate configuration without creating service
         /// Performs basic configuration checks before service instantiation
         /// </summary>
@@ -101,6 +129,7 @@ namespace SpeechToTextTray.Core.Services.Transcription
             {
                 TranscriptionProvider.Local => ValidateLocalConfig(config.Local),
                 TranscriptionProvider.Azure => ValidateAzureConfig(config.Azure),
+                TranscriptionProvider.AzureOpenAI => ValidateAzureOpenAIConfig(config.AzureOpenAI),
                 _ => new ValidationResult
                 {
                     IsValid = false,
@@ -156,6 +185,59 @@ namespace SpeechToTextTray.Core.Services.Transcription
                 {
                     IsValid = false,
                     ErrorMessage = "Azure region is required",
+                    ErrorType = ValidationErrorType.MissingConfiguration
+                };
+            }
+
+            return new ValidationResult
+            {
+                IsValid = true,
+                ErrorMessage = null,
+                ErrorType = ValidationErrorType.None
+            };
+        }
+
+        /// <summary>
+        /// Validate Azure OpenAI configuration
+        /// </summary>
+        private static ValidationResult ValidateAzureOpenAIConfig(AzureOpenAITranscriptionConfig config)
+        {
+            if (config == null)
+            {
+                return new ValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Azure OpenAI configuration is missing",
+                    ErrorType = ValidationErrorType.MissingConfiguration
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(config.Endpoint))
+            {
+                return new ValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Azure OpenAI endpoint is required",
+                    ErrorType = ValidationErrorType.MissingConfiguration
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(config.ApiKey))
+            {
+                return new ValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Azure OpenAI API key is required",
+                    ErrorType = ValidationErrorType.MissingConfiguration
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(config.DeploymentName))
+            {
+                return new ValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Azure OpenAI deployment name is required",
                     ErrorType = ValidationErrorType.MissingConfiguration
                 };
             }
