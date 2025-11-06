@@ -88,6 +88,10 @@ namespace SpeechToTextTray
             _tempFileManager = new TempFileManager();
             _notificationHelper = new NotificationHelper(_settings.ShowNotifications);
 
+            // Initialize audio device (pre-opens device to eliminate capture delay)
+            _audioService.Initialize(_settings.AudioDeviceId);
+            Logger.Info($"Audio device initialized: {_settings.AudioDeviceId}");
+
             // Subscribe to hotkey events
             _hotkeyService.HotkeyPressed += OnHotkeyPressed;
 
@@ -176,10 +180,8 @@ namespace SpeechToTextTray
         {
             try
             {
-                await Dispatcher.InvokeAsync(async () =>
-                {
-                    await ToggleRecordingAsync();
-                });
+                // NHotkey.Wpf already invokes on UI thread, no Dispatcher needed
+                await ToggleRecordingAsync();
             }
             catch (Exception ex)
             {
@@ -230,8 +232,8 @@ namespace SpeechToTextTray
             // Create temp file
             _currentRecordingPath = _tempFileManager.CreateTempFilePath();
 
-            // Start recording
-            _audioService.StartRecording(_settings.AudioDeviceId, _currentRecordingPath);
+            // Start recording (device already initialized, starts immediately)
+            _audioService.StartRecording(_currentRecordingPath);
 
             Logger.Info($"Recording started: {_currentRecordingPath}");
         }
@@ -342,6 +344,10 @@ namespace SpeechToTextTray
             // Re-register hotkey
             _hotkeyService.UnregisterHotkey();
             RegisterHotkey();
+
+            // Update audio device if changed
+            _audioService.ChangeDevice(_settings.AudioDeviceId);
+            Logger.Info($"Audio device updated: {_settings.AudioDeviceId}");
 
             // Update API client timeout
             _apiClient?.Dispose();

@@ -15,11 +15,17 @@ namespace SpeechToTextTray.Core.Services
         private WaveFileWriter? _writer;
         private string? _currentFilePath;
         private DateTime _recordingStartTime;
+        private string _currentDeviceId = "default";
 
         /// <summary>
         /// Sample rate required by the backend (16kHz)
         /// </summary>
         private const int SampleRate = 16000;
+
+        /// <summary>
+        /// Buffer size in milliseconds - optimized for low latency
+        /// </summary>
+        private const int BufferMilliseconds = 50;
 
         /// <summary>
         /// Event fired when audio level changes (for visual feedback)
@@ -67,15 +73,39 @@ namespace SpeechToTextTray.Core.Services
         }
 
         /// <summary>
-        /// Start recording audio to a WAV file
+        /// Initialize audio device for recording. Call this once at startup.
+        /// Pre-opens the audio device to eliminate startup delay.
         /// </summary>
         /// <param name="deviceId">Device ID (from AudioDevice.Id), or null for default</param>
-        /// <param name="outputPath">Path where the WAV file will be saved</param>
-        public void StartRecording(string deviceId, string outputPath)
+        public void Initialize(string deviceId)
         {
-            if (IsRecording)
-                throw new InvalidOperationException("Already recording");
+            _currentDeviceId = deviceId ?? "default";
+            InitializeWaveIn(_currentDeviceId);
+        }
 
+        /// <summary>
+        /// Change the audio device. Disposes the current device and initializes the new one.
+        /// </summary>
+        /// <param name="deviceId">Device ID (from AudioDevice.Id), or null for default</param>
+        public void ChangeDevice(string deviceId)
+        {
+            string newDeviceId = deviceId ?? "default";
+            if (_currentDeviceId == newDeviceId)
+                return;
+
+            if (IsRecording)
+                throw new InvalidOperationException("Cannot change device while recording");
+
+            DisposeWaveIn();
+            _currentDeviceId = newDeviceId;
+            InitializeWaveIn(_currentDeviceId);
+        }
+
+        /// <summary>
+        /// Initialize WaveInEvent with the specified device
+        /// </summary>
+        private void InitializeWaveIn(string deviceId)
+        {
             // Parse device number
             int deviceNumber = 0;
             if (!string.IsNullOrEmpty(deviceId) && deviceId != "default")
@@ -88,38 +118,61 @@ namespace SpeechToTextTray.Core.Services
             if (deviceNumber < 0 || deviceNumber >= WaveInEvent.DeviceCount)
                 throw new ArgumentException($"Invalid device ID: {deviceId}");
 
-            // Create WaveIn event for recording
+            // Create WaveIn event for recording with optimized buffer settings
             _waveIn = new WaveInEvent
             {
                 DeviceNumber = deviceNumber,
-                WaveFormat = new WaveFormat(SampleRate, 1) // 16kHz, mono
+                WaveFormat = new WaveFormat(SampleRate, 1), // 16kHz, mono
+                BufferMilliseconds = BufferMilliseconds,     // Low latency buffer
+                NumberOfBuffers = 3                          // Adequate for reliability
             };
 
-            // Create WAV file writer
+            // Wire up event handlers (done once)
+            _waveIn.DataAvailable += OnDataAvailable;
+            _waveIn.RecordingStopped += OnRecordingStopped;
+        }
+
+        /// <summary>
+        /// Handle incoming audio data
+        /// </summary>
+        private void OnDataAvailable(object? sender, WaveInEventArgs e)
+        {
+            // Write to file
+            _writer?.Write(e.Buffer, 0, e.BytesRecorded);
+
+            // Calculate audio level for visualization
+            float level = CalculateLevel(e.Buffer, e.BytesRecorded);
+            AudioLevelChanged?.Invoke(this, level);
+        }
+
+        /// <summary>
+        /// Handle recording stopped event
+        /// </summary>
+        private void OnRecordingStopped(object? sender, StoppedEventArgs e)
+        {
+            if (e.Exception != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"Recording error: {e.Exception.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Start recording audio to a WAV file. Device must be initialized first.
+        /// </summary>
+        /// <param name="outputPath">Path where the WAV file will be saved</param>
+        public void StartRecording(string outputPath)
+        {
+            if (IsRecording)
+                throw new InvalidOperationException("Already recording");
+
+            if (_waveIn == null)
+                throw new InvalidOperationException("Audio device not initialized. Call Initialize() first.");
+
+            // Create WAV file writer (fast operation)
             _writer = new WaveFileWriter(outputPath, _waveIn.WaveFormat);
             _currentFilePath = outputPath;
 
-            // Handle data available
-            _waveIn.DataAvailable += (sender, e) =>
-            {
-                // Write to file
-                _writer.Write(e.Buffer, 0, e.BytesRecorded);
-
-                // Calculate audio level for visualization
-                float level = CalculateLevel(e.Buffer, e.BytesRecorded);
-                AudioLevelChanged?.Invoke(this, level);
-            };
-
-            // Handle recording stopped
-            _waveIn.RecordingStopped += (sender, e) =>
-            {
-                if (e.Exception != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Recording error: {e.Exception.Message}");
-                }
-            };
-
-            // Start recording
+            // Start recording (fast - device already initialized)
             _recordingStartTime = DateTime.Now;
             _waveIn.StartRecording();
             IsRecording = true;
@@ -133,14 +186,34 @@ namespace SpeechToTextTray.Core.Services
             if (!IsRecording)
                 return;
 
+            // Stop recording (but keep device open for next recording)
             _waveIn?.StopRecording();
-            _waveIn?.Dispose();
-            _waveIn = null!;
 
+            // Dispose writer
             _writer?.Dispose();
             _writer = null!;
 
             IsRecording = false;
+        }
+
+        /// <summary>
+        /// Dispose WaveInEvent and unhook event handlers
+        /// </summary>
+        private void DisposeWaveIn()
+        {
+            if (_waveIn != null)
+            {
+                if (IsRecording)
+                {
+                    _waveIn.StopRecording();
+                    IsRecording = false;
+                }
+
+                _waveIn.DataAvailable -= OnDataAvailable;
+                _waveIn.RecordingStopped -= OnRecordingStopped;
+                _waveIn.Dispose();
+                _waveIn = null;
+            }
         }
 
         /// <summary>
@@ -166,7 +239,8 @@ namespace SpeechToTextTray.Core.Services
 
         public void Dispose()
         {
-            StopRecording();
+            DisposeWaveIn();
+            _writer?.Dispose();
         }
     }
 }
