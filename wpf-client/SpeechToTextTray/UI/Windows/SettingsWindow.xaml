@@ -54,25 +54,6 @@
                            FontSize="10"
                            Margin="0,3,0,0"/>
 
-                <!-- Backend URL Section -->
-                <Label Content="Backend Server URL:" FontSize="14" Margin="0,20,0,5"/>
-                <DockPanel>
-                    <Button Content="Test"
-                            Width="60"
-                            Height="30"
-                            Margin="5,0,0,0"
-                            DockPanel.Dock="Right"
-                            Click="TestBackend_Click"/>
-                    <TextBox x:Name="backendUrlInput"
-                             Text="http://localhost:8000"
-                             VerticalContentAlignment="Center"/>
-                </DockPanel>
-                <TextBlock x:Name="backendStatusText"
-                           Foreground="Gray"
-                           FontSize="10"
-                           Margin="0,3,0,0"
-                           Text="Ensure the backend server is running"/>
-
                 <!-- Options Section -->
                 <Label Content="Options:" FontSize="14" Margin="0,20,0,5"/>
                 <CheckBox x:Name="startWithWindowsCheck"
@@ -86,13 +67,6 @@
                           Margin="20,5,0,0"/>
                 <CheckBox x:Name="playSoundsCheck"
                           Content="Play sound effects"/>
-
-                <!-- Timeout Section -->
-                <Label Content="API Timeout (seconds):" FontSize="14" Margin="0,20,0,5"/>
-                <TextBox x:Name="timeoutInput"
-                         Text="120"
-                         PreviewTextInput="NumberValidation"
-                         VerticalContentAlignment="Center"/>
             </StackPanel>
         </ScrollViewer>
 

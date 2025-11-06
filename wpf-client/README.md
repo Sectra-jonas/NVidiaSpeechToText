@@ -1,6 +1,6 @@
-# Speech-to-Text Windows Tray Application
+# Speech-to-Text Windows Tray Application (Standalone)
 
-A Windows 11 system tray application for real-time speech-to-text transcription using NVIDIA Parakeet model. Record audio with a global hotkey and automatically insert transcribed text into any application.
+A Windows 11 system tray application for real-time speech-to-text transcription using NVIDIA Parakeet ONNX model. Record audio with a global hotkey and automatically insert transcribed text into any application. **Completely standalone - no backend or internet required!**
 
 ## Features
 
@@ -11,6 +11,9 @@ A Windows 11 system tray application for real-time speech-to-text transcription 
 - ⚙️ **GUI Configuration**: User-friendly settings window
 - 🔄 **Clipboard Fallback**: Automatically copies to clipboard if text injection fails
 - 📝 **Logging**: Detailed logs for debugging and troubleshooting
+- 🏠 **Offline Transcription**: All processing happens locally using sherpa-onnx ONNX Runtime
+- 🌍 **25 Languages**: Supports 25 European languages with automatic detection
+- ⚙️ **CPU-Only**: Works on all Windows machines without GPU requirements
 
 ## Prerequisites
 
@@ -18,12 +21,14 @@ A Windows 11 system tray application for real-time speech-to-text transcription 
 - **Windows 11** (or Windows 10)
 - **.NET 8.0 SDK or Runtime** - [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
 - **Visual Studio 2022** (for building from source) - Community Edition is free
-- **Backend Server**: The FastAPI backend must be running (see main README)
 
 ### System Requirements
 - Microphone/audio input device
-- Minimum 4GB RAM
+- Minimum 4GB RAM (8GB recommended)
+- ~1GB disk space (640MB for ONNX model)
 - Windows with .NET 8.0 runtime installed
+- **No GPU required** - runs on CPU
+- **No internet required** - fully offline after installation
 
 ## Installation
 
@@ -70,16 +75,13 @@ The executable will be in: `bin\Release\net8.0-windows\win-x64\publish\SpeechToT
 
 ### First Launch
 
-1. **Start the Backend Server**
-   - Make sure the FastAPI backend is running at `http://localhost:8000`
-   - See main project README for backend setup
-
-2. **Launch the Application**
+1. **Launch the Application**
    - Run `SpeechToTextTray.exe`
    - The app will appear in the system tray (look for microphone icon)
+   - First startup takes 1-2 seconds to load the ONNX model
    - No main window will appear (it's a tray-only application)
 
-3. **Configure Settings** (Optional)
+2. **Configure Settings** (Optional)
    - Right-click the tray icon → Settings
    - Configure your preferred hotkey (default: Ctrl+Shift+Space)
    - Select your microphone device
@@ -120,13 +122,11 @@ Settings are stored in: `%APPDATA%\SpeechToTextTray\settings.json`
 |---------|-------------|---------|
 | **Hotkey** | Global keyboard shortcut to toggle recording | Ctrl + Shift + Space |
 | **Audio Device** | Microphone/input device ID | Default device |
-| **Backend URL** | FastAPI server address | http://localhost:8000 |
 | **Start with Windows** | Launch on Windows startup | False |
 | **Show Notifications** | Display toast notifications | True |
 | **Auto-inject Text** | Automatically insert transcribed text | True |
 | **Fallback to Clipboard** | Copy to clipboard if injection fails | True |
 | **Play Sound Effects** | Audio feedback on recording start/stop | False |
-| **Timeout (seconds)** | API request timeout | 120 |
 
 ### Changing the Hotkey
 
@@ -145,8 +145,8 @@ Settings are stored in: `%APPDATA%\SpeechToTextTray\settings.json`
 SpeechToTextTray/
 ├── Core/
 │   ├── Services/           # Core business logic
+│   │   ├── LocalTranscriptionService.cs   (sherpa-onnx ONNX Runtime)
 │   │   ├── AudioRecordingService.cs       (NAudio integration)
-│   │   ├── BackendApiClient.cs            (FastAPI HTTP client)
 │   │   ├── TextInjectionService.cs        (Win32 SendInput API)
 │   │   ├── GlobalHotkeyService.cs         (Hotkey registration)
 │   │   └── SettingsService.cs             (Configuration persistence)
@@ -167,6 +167,12 @@ SpeechToTextTray/
 ├── Utils/                  # Utilities
 │   ├── Logger.cs
 │   └── NotificationHelper.cs
+├── Models/                 # ONNX model files (~640MB)
+│   └── sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/
+│       ├── encoder.int8.onnx
+│       ├── decoder.int8.onnx
+│       ├── joiner.int8.onnx
+│       └── tokens.txt
 ├── Resources/              # Assets
 │   └── Icons/              # Tray icons (.ico files)
 ├── App.xaml/cs             # Application entry point
@@ -176,11 +182,12 @@ SpeechToTextTray/
 ### Key Technologies
 
 - **WPF (.NET 8.0)**: UI framework
+- **sherpa-onnx (1.12.15)**: ONNX Runtime for local speech recognition
 - **Hardcodet.NotifyIcon.Wpf**: System tray functionality
 - **NHotkey.Wpf**: Global hotkey registration (no admin required)
-- **NAudio**: Audio capture from Windows devices
+- **NAudio (2.2.1)**: Audio capture from Windows devices
 - **Win32 SendInput API**: Text injection via P/Invoke
-- **HttpClient**: REST API communication with FastAPI backend
+- **Parakeet-TDT ONNX Model**: INT8 quantized model (~640MB)
 
 ### Data Flow
 
@@ -191,8 +198,9 @@ User presses hotkey
   → AudioRecordingService captures audio (16kHz WAV)
   → User presses hotkey again
   → App.xaml.cs: StopRecordingAsync()
-  → BackendApiClient uploads WAV to FastAPI
-  → Receive transcription JSON response
+  → LocalTranscriptionService processes WAV locally
+  → sherpa-onnx ONNX Runtime performs inference
+  → Receive transcription text
   → TextInjectionService injects text into active window
   → Clean up temp file
   → Return to idle state
@@ -242,17 +250,6 @@ User presses hotkey
 - Check device is not muted or disabled
 - Try selecting a different audio device
 
-### Backend Connection Failed
-
-**Issue**: "Backend Not Available" notification appears
-
-**Solutions**:
-- Ensure FastAPI backend is running: `python backend/app.py`
-- Check backend URL is correct in settings (default: http://localhost:8000)
-- Test backend manually: Open http://localhost:8000 in browser
-- Check firewall isn't blocking connections
-- Use "Test" button in Settings to diagnose
-
 ### High Memory Usage
 
 **Issue**: Application uses excessive RAM
@@ -285,8 +282,9 @@ type "%APPDATA%\SpeechToTextTray\logs\app_20250101.log"
 
 ### Common Log Messages
 
+- `Services initialized (Local transcription)` - Application started successfully
 - `Hotkey registered: Ctrl + Shift + Space` - Hotkey setup successful
-- `Backend is not reachable` - Backend server offline
+- `Transcribing audio locally...` - Local ONNX inference in progress
 - `Text injection failed, copied to clipboard` - Fallback behavior activated
 - `Failed to register hotkey` - Hotkey conflict detected
 
@@ -320,23 +318,28 @@ Release build is optimized and located in: `bin\Release\net8.0-windows\`
    - **Workaround**: Run SpeechToTextTray as Administrator (not recommended for security)
    - **Alternative**: Text is copied to clipboard, paste manually
 
-2. **Long Recordings**: Very long recordings (>5 minutes) may timeout
-   - **Workaround**: Increase timeout in settings
-   - **Workaround**: Keep recordings under 3-4 minutes
+2. **Long Recordings**: Transcription time increases with recording length
+   - **Recommendation**: Keep recordings under 2-3 minutes for best experience
+   - CPU transcription is slower than GPU but works on all machines
 
 3. **Some Applications**: Certain applications (games, IDEs) may not accept SendInput
    - **Workaround**: Use clipboard fallback (enabled by default)
 
+4. **First Run**: Initial model loading takes 1-2 seconds
+   - **Normal**: sherpa-onnx loads ONNX model into memory on startup
+
 ## Future Enhancements
 
+- [ ] GPU acceleration support via CUDA
 - [ ] Windows 10 Toast Notifications integration
 - [ ] Sound effects for recording start/stop
 - [ ] Visual overlay indicator (floating window)
 - [ ] Recording history viewer
 - [ ] Custom text post-processing rules
 - [ ] Multiple hotkey support (e.g., one for dictation, one for commands)
-- [ ] Support for other ASR backends
+- [ ] Support for other ONNX ASR models
 - [ ] Auto-update mechanism
+- [ ] Model downloader/updater
 
 ## License
 
@@ -346,13 +349,14 @@ See main project README for license information.
 
 For issues, questions, or feature requests:
 1. Check logs: `%APPDATA%\SpeechToTextTray\logs\`
-2. Review backend logs: `backend/` directory
-3. Ensure backend is running and healthy
+2. Verify ONNX model files are present in Models/ directory
+3. Ensure .NET 8.0 runtime is installed
 4. Open an issue in the project repository
 
 ## Credits
 
 - **NVIDIA NeMo & Parakeet**: ASR model
+- **sherpa-onnx (Next-gen Kaldi)**: ONNX Runtime framework
 - **NAudio**: Audio recording library
 - **Hardcodet.NotifyIcon.Wpf**: System tray functionality
 - **NHotkey**: Global hotkey registration

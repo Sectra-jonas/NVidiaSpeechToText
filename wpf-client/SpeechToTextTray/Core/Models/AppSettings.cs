@@ -8,11 +8,6 @@ namespace SpeechToTextTray.Core.Models
     public class AppSettings
     {
         /// <summary>
-        /// Backend API base URL
-        /// </summary>
-        public string BackendUrl { get; set; } = "http://localhost:8000";
-
-        /// <summary>
         /// Global hotkey configuration for toggle recording
         /// </summary>
         public HotkeyConfig Hotkey { get; set; } = new HotkeyConfig
@@ -50,11 +45,6 @@ namespace SpeechToTextTray.Core.Models
         /// Whether to play sound effects on start/stop recording
         /// </summary>
         public bool PlaySoundEffects { get; set; } = false;
-
-        /// <summary>
-        /// API request timeout in seconds
-        /// </summary>
-        public int TimeoutSeconds { get; set; } = 120;
     }
 
     /// <summary>

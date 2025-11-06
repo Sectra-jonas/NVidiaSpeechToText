@@ -4,10 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Speech-to-text application using NVIDIA Parakeet-TDT-0.6b-v3 model with multiple frontends:
-- **Browser Frontend**: Web-based audio recording for portable use
-- **Windows Tray App**: Native Windows 11 application with global hotkey support and automatic text injection
-- **Shared Backend**: FastAPI server for transcription (supports both frontends)
+Speech-to-text application using NVIDIA Parakeet-TDT-0.6b-v3 model:
+- **Windows Tray App (Standalone)**: Native Windows 11 application with embedded ONNX transcription, global hotkey support, and automatic text injection. **RECOMMENDED**
+- **Browser Frontend (Deprecated)**: Web-based audio recording - requires Python backend
+- **Python Backend (Deprecated)**: FastAPI server for transcription - kept for reference, no longer required for WPF app
+
+The standalone WPF app includes the ONNX model (~640MB) and performs transcription locally using sherpa-onnx.
 
 Supports 25 European languages with automatic detection.
 
@@ -31,33 +33,29 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121 
 
 ### Running the Application
 
-#### Backend (Required for all frontends)
-```bash
-cd backend
-python app.py
-# Server runs on http://localhost:8000
-# First startup takes 2-5 minutes to download Parakeet model (~600MB)
-```
-
-#### Browser Frontend (Option 1)
-```bash
-cd frontend
-python -m http.server 3000
-# Open http://localhost:3000 in browser
-```
-
-#### Windows Tray App (Option 2)
+#### Windows Tray App (Standalone - Recommended)
 ```bash
 cd wpf-client/SpeechToTextTray
 dotnet build
 dotnet run
 # Or open SpeechToTextTray.sln in Visual Studio 2022
+# ONNX model files (~640MB) are bundled in Models/ directory
+# First run may take 1-2 seconds to load the model
 ```
 
-#### Alternative: Windows Batch Scripts
+#### Python Backend + Browser Frontend (Deprecated - Optional)
 ```bash
-start_backend.bat   # Start Python backend
-start_frontend.bat  # Start browser frontend
+# Only needed if you want to use the browser frontend
+
+# Terminal 1: Start backend
+cd backend
+python app.py
+# Server runs on http://localhost:8000
+
+# Terminal 2: Start frontend
+cd frontend
+python -m http.server 3000
+# Open http://localhost:3000 in browser
 ```
 
 ### Testing API Endpoints
@@ -89,24 +87,27 @@ curl -X POST http://localhost:8000/transcribe -F "audio=@recording.webm"
 
 **Flow**: Record via MediaRecorder → Create audio blob → POST to `/transcribe` → Display transcription with metadata (language, duration)
 
-### Windows Tray App (C# WPF .NET 8)
+### Windows Tray App (C# WPF .NET 8) - Standalone
 - **App.xaml.cs**: Application lifecycle, service initialization, hotkey event handling
 - **Core/Services**:
+  - `LocalTranscriptionService` (sherpa-onnx - local ONNX model inference, no network required)
   - `GlobalHotkeyService` (NHotkey.Wpf - RegisterHotKey API, no admin needed)
   - `AudioRecordingService` (NAudio - 16kHz WAV recording from Windows devices)
-  - `BackendApiClient` (HttpClient - multipart upload to FastAPI)
   - `TextInjectionService` (Win32 SendInput API via P/Invoke, clipboard fallback)
   - `SettingsService` (JSON persistence in %APPDATA%)
 - **UI/TrayIcon**: System tray icon with state-based visuals (idle/recording/processing)
-- **UI/Windows/SettingsWindow**: GUI for hotkey, device, backend URL configuration
+- **UI/Windows/SettingsWindow**: GUI for hotkey and device configuration
+- **Models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8**: Bundled ONNX model files (~640MB)
 
 **Key Features**:
+- **Offline transcription** - No backend or internet required
 - Global hotkey toggle (default: Ctrl+Shift+Space)
 - Automatic text injection into focused window
 - Device selection from Windows audio devices
 - Tray icon color changes by state
+- CPU-only inference (works on all Windows machines)
 
-**Flow**: Hotkey pressed → NAudio records WAV → POST to `/transcribe` → SendInput injects text → Cleanup temp files
+**Flow**: Hotkey pressed → NAudio records WAV → Local ONNX transcription → SendInput injects text → Cleanup temp files
 
 ### Data Flow
 ```
@@ -156,8 +157,9 @@ frontend/
 wpf-client/
   SpeechToTextTray/
     Core/
-      Services/          # Business logic (audio, API, hotkeys, text injection, settings)
-      Models/            # Data models (AppSettings, AudioDevice, RecordingState)
+      Services/          # Business logic (local transcription, audio, hotkeys, text injection, settings)
+        LocalTranscriptionService.cs  # sherpa-onnx ONNX model inference
+      Models/            # Data models (AppSettings, AudioDevice, RecordingState, TranscriptionResponse)
       Helpers/           # Utilities (TempFileManager)
     UI/
       TrayIcon/          # System tray manager
@@ -165,17 +167,27 @@ wpf-client/
       Controls/          # HotkeyTextBox custom control
     Utils/               # Logger, NotificationHelper
     App.xaml/cs          # WPF application entry point
+    Models/              # ONNX model files (~640MB)
+      sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/
+        encoder.int8.onnx
+        decoder.int8.onnx
+        joiner.int8.onnx
+        tokens.txt
     Resources/Icons/     # Tray icons (.ico files - idle, recording, processing)
   README.md              # WPF client documentation
 ```
 
-## WPF Client Notes
+## WPF Client Notes (Standalone)
 
 - **Prerequisites**: .NET 8.0 SDK, Visual Studio 2022, icon files (see wpf-client/SpeechToTextTray/Resources/Icons/README.md)
-- **NuGet Packages**: Hardcodet.NotifyIcon.Wpf, NHotkey.Wpf, NAudio 2.2.1
+- **NuGet Packages**: Hardcodet.NotifyIcon.Wpf, NHotkey.Wpf, NAudio 2.2.1, org.k2fsa.sherpa.onnx 1.12.15
+- **Model Files**: Bundled in Models/ directory (~640MB), copied to output directory on build
+- **Model Info**: sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 (INT8 quantized ONNX)
+- **Transcription**: Local CPU-only inference using sherpa-onnx (no network required)
 - **Settings Location**: %APPDATA%\SpeechToTextTray\settings.json
 - **Logs**: %APPDATA%\SpeechToTextTray\logs\app_YYYYMMDD.log
 - **Temp Files**: %TEMP%\SpeechToTextTray\ (auto-cleanup keeps last 10)
 - **Text Injection**: Multi-tier approach (SendInput → SendKeys → Clipboard)
 - **No Admin Required**: Uses RegisterHotKey API (not low-level hooks)
+- **No Backend Required**: Completely standalone, no Python dependencies
 - **Elevated Apps**: Text injection may fail for apps running as Administrator (clipboard fallback works)

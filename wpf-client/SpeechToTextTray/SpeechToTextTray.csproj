@@ -27,14 +27,22 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
 
-    <!-- HTTP Client & JSON (built-in, but include for clarity) -->
-    <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
+    <!-- Speech Recognition (ONNX Runtime) -->
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.12.15" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Include icon resources -->
     <Resource Include="Resources\Icons\*.ico" />
     <Resource Include="Resources\Icons\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy ONNX model files to output directory -->
+    <None Include="Models\sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Models\sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

@@ -16,7 +16,6 @@ namespace SpeechToTextTray.UI.Windows
     {
         private readonly SettingsService _settingsService;
         private readonly AudioRecordingService _audioService;
-        private readonly BackendApiClient _apiClient;
         private AppSettings _currentSettings;
 
         public AppSettings? UpdatedSettings { get; private set; }
@@ -25,14 +24,12 @@ namespace SpeechToTextTray.UI.Windows
         public SettingsWindow(
             SettingsService settingsService,
             AudioRecordingService audioService,
-            BackendApiClient apiClient,
             AppSettings currentSettings)
         {
             InitializeComponent();
 
             _settingsService = settingsService;
             _audioService = audioService;
-            _apiClient = apiClient;
             _currentSettings = currentSettings;
 
             LoadSettings();
@@ -44,18 +41,12 @@ namespace SpeechToTextTray.UI.Windows
             // Set hotkey
             hotkeyInput.HotkeyConfig = _currentSettings.Hotkey;
 
-            // Set backend URL
-            backendUrlInput.Text = _currentSettings.BackendUrl;
-
             // Set options
             startWithWindowsCheck.IsChecked = _currentSettings.StartWithWindows;
             showNotificationsCheck.IsChecked = _currentSettings.ShowNotifications;
             injectTextCheck.IsChecked = _currentSettings.InjectTextAutomatically;
             fallbackClipboardCheck.IsChecked = _currentSettings.FallbackToClipboard;
             playSoundsCheck.IsChecked = _currentSettings.PlaySoundEffects;
-
-            // Set timeout
-            timeoutInput.Text = _currentSettings.TimeoutSeconds.ToString();
 
             // Enable/disable fallback option based on inject text option
             fallbackClipboardCheck.IsEnabled = injectTextCheck.IsChecked ?? false;
@@ -99,56 +90,6 @@ namespace SpeechToTextTray.UI.Windows
             }
         }
 
-        private async void TestBackend_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                backendStatusText.Text = "Testing connection...";
-                backendStatusText.Foreground = System.Windows.Media.Brushes.Gray;
-
-                var testClient = new BackendApiClient(backendUrlInput.Text, 10);
-                bool isOnline = await testClient.IsBackendOnlineAsync();
-
-                if (isOnline)
-                {
-                    var health = await testClient.CheckHealthAsync();
-                    backendStatusText.Text = $"✓ Connected - Model: {health.Model.ModelName} ({health.Model.Device})";
-                    backendStatusText.Foreground = System.Windows.Media.Brushes.Green;
-
-                    MessageBox.Show(
-                        $"Backend is online!\n\nModel: {health.Model.ModelName}\nDevice: {health.Model.Device}\nStatus: {health.Model.Status}",
-                        "Connection Test",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
-                else
-                {
-                    backendStatusText.Text = "✗ Cannot connect to backend server";
-                    backendStatusText.Foreground = System.Windows.Media.Brushes.Red;
-
-                    MessageBox.Show(
-                        "Cannot connect to backend server.\n\nPlease ensure:\n1. The backend is running\n2. The URL is correct\n3. No firewall is blocking the connection",
-                        "Connection Failed",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                }
-
-                testClient.Dispose();
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Backend test failed", ex);
-                backendStatusText.Text = $"✗ Error: {ex.Message}";
-                backendStatusText.Foreground = System.Windows.Media.Brushes.Red;
-
-                MessageBox.Show(
-                    $"Connection test failed:\n\n{ex.Message}",
-                    "Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
-        }
-
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -164,40 +105,16 @@ namespace SpeechToTextTray.UI.Windows
                     return;
                 }
 
-                // Validate backend URL
-                if (string.IsNullOrWhiteSpace(backendUrlInput.Text))
-                {
-                    MessageBox.Show(
-                        "Please enter a valid backend URL.",
-                        "Validation Error",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                // Validate timeout
-                if (!int.TryParse(timeoutInput.Text, out int timeout) || timeout < 10)
-                {
-                    MessageBox.Show(
-                        "Please enter a valid timeout (minimum 10 seconds).",
-                        "Validation Error",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
                 // Create updated settings
                 UpdatedSettings = new AppSettings
                 {
                     Hotkey = hotkeyInput.HotkeyConfig,
                     AudioDeviceId = (audioDeviceCombo.SelectedItem as AudioDevice)?.Id ?? "default",
-                    BackendUrl = backendUrlInput.Text.TrimEnd('/'),
                     StartWithWindows = startWithWindowsCheck.IsChecked ?? false,
                     ShowNotifications = showNotificationsCheck.IsChecked ?? true,
                     InjectTextAutomatically = injectTextCheck.IsChecked ?? true,
                     FallbackToClipboard = fallbackClipboardCheck.IsChecked ?? true,
-                    PlaySoundEffects = playSoundsCheck.IsChecked ?? false,
-                    TimeoutSeconds = timeout
+                    PlaySoundEffects = playSoundsCheck.IsChecked ?? false
                 };
 
                 // Save to file
@@ -238,13 +155,6 @@ namespace SpeechToTextTray.UI.Windows
                 _currentSettings = _settingsService.GetDefaultSettings();
                 LoadSettings();
             }
-        }
-
-        private void NumberValidation(object sender, System.Windows.Input.TextCompositionEventArgs e)
-        {
-            // Only allow numbers
-            Regex regex = new Regex("[^0-9]+");
-            e.Handled = regex.IsMatch(e.Text);
         }
     }
 }

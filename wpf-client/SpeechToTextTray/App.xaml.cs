@@ -18,7 +18,7 @@ namespace SpeechToTextTray
         private TrayIconManager _trayIcon = null!;
         private GlobalHotkeyService _hotkeyService = null!;
         private AudioRecordingService _audioService = null!;
-        private BackendApiClient _apiClient = null!;
+        private LocalTranscriptionService _transcriptionService = null!;
         private TextInjectionService _textInjection = null!;
         private SettingsService _settingsService = null!;
         private TempFileManager _tempFileManager = null!;
@@ -53,9 +53,6 @@ namespace SpeechToTextTray
                 // Register hotkey
                 RegisterHotkey();
 
-                // Check backend health (async, don't block startup)
-                CheckBackendHealthAsync();
-
                 // Clean up old temp files and logs
                 CleanupOldFiles();
 
@@ -82,7 +79,7 @@ namespace SpeechToTextTray
 
             // Core services
             _audioService = new AudioRecordingService();
-            _apiClient = new BackendApiClient(_settings.BackendUrl, _settings.TimeoutSeconds);
+            _transcriptionService = new LocalTranscriptionService();
             _textInjection = new TextInjectionService(_settings.FallbackToClipboard);
             _hotkeyService = new GlobalHotkeyService();
             _tempFileManager = new TempFileManager();
@@ -95,7 +92,7 @@ namespace SpeechToTextTray
             // Subscribe to hotkey events
             _hotkeyService.HotkeyPressed += OnHotkeyPressed;
 
-            Logger.Info("Services initialized");
+            Logger.Info("Services initialized (Local transcription)");
         }
 
         private void InitializeTrayIcon()
@@ -131,30 +128,6 @@ namespace SpeechToTextTray
                     "Hotkey Registration Failed",
                     $"The hotkey {_settings.Hotkey} is already in use. Please change it in settings.",
                     Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
-            }
-        }
-
-        private async void CheckBackendHealthAsync()
-        {
-            try
-            {
-                bool isOnline = await _apiClient.IsBackendOnlineAsync();
-                if (!isOnline)
-                {
-                    Logger.Warning("Backend is not reachable");
-                    _trayIcon?.ShowNotification(
-                        "Backend Not Available",
-                        "The backend server is not running. Please start it to use transcription.",
-                        Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
-                }
-                else
-                {
-                    Logger.Info("Backend is online");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Backend health check failed", ex);
             }
         }
 
@@ -251,9 +224,9 @@ namespace SpeechToTextTray
 
             try
             {
-                // Transcribe
-                Logger.Info("Sending audio to backend...");
-                var result = await _apiClient.TranscribeAsync(_currentRecordingPath);
+                // Transcribe locally
+                Logger.Info("Transcribing audio locally...");
+                var result = await _transcriptionService.TranscribeAsync(_currentRecordingPath);
 
                 Logger.Info($"Transcription received: {result.Text.Length} characters, Language: {result.Language}");
 
@@ -316,7 +289,6 @@ namespace SpeechToTextTray
                 var settingsWindow = new SettingsWindow(
                     _settingsService,
                     _audioService,
-                    _apiClient,
                     _settings);
 
                 if (settingsWindow.ShowDialog() == true && settingsWindow.SettingsChanged)
@@ -348,10 +320,6 @@ namespace SpeechToTextTray
             // Update audio device if changed
             _audioService.ChangeDevice(_settings.AudioDeviceId);
             Logger.Info($"Audio device updated: {_settings.AudioDeviceId}");
-
-            // Update API client timeout
-            _apiClient?.Dispose();
-            _apiClient = new BackendApiClient(_settings.BackendUrl, _settings.TimeoutSeconds);
 
             // Update text injection service
             _textInjection = new TextInjectionService(_settings.FallbackToClipboard);
@@ -399,7 +367,7 @@ namespace SpeechToTextTray
             // Cleanup
             _hotkeyService?.Dispose();
             _audioService?.Dispose();
-            _apiClient?.Dispose();
+            _transcriptionService?.Dispose();
             _trayIcon?.Dispose();
 
             // Clean up temp files on exit (optional)
