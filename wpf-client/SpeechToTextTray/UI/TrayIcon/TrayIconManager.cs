@@ -83,7 +83,7 @@ namespace SpeechToTextTray.UI.TrayIcon
         /// <summary>
         /// Update the tray icon state
         /// </summary>
-        public void SetState(RecordingState state, string additionalInfo = null)
+        public void SetState(RecordingState state, string? additionalInfo = null)
         {
             _currentState = state;
 
@@ -140,15 +140,15 @@ namespace SpeechToTextTray.UI.TrayIcon
             }
             catch
             {
-                // Fallback: create a simple colored icon
-                return CreateFallbackIcon(state);
+                // Fallback: create a simple colored icon (null is acceptable for fallback)
+                return CreateFallbackIcon(state)!;
             }
         }
 
         /// <summary>
         /// Create a simple fallback icon if resource icons aren't available
         /// </summary>
-        private System.Windows.Media.ImageSource CreateFallbackIcon(RecordingState state)
+        private System.Windows.Media.ImageSource? CreateFallbackIcon(RecordingState state)
         {
             // This would create a simple colored square as an icon
             // For now, return null and the system will use a default icon

@@ -288,43 +288,46 @@ namespace SpeechToTextTray.Core.Services.Transcription
 
         public async Task<ValidationResult> ValidateConfigurationAsync()
         {
-            try
+            return await Task.Run(() =>
             {
-                // Check network connectivity
-                if (!IsNetworkAvailable())
+                try
                 {
+                    // Check network connectivity
+                    if (!IsNetworkAvailable())
+                    {
+                        return new ValidationResult
+                        {
+                            IsValid = false,
+                            ErrorMessage = "No network connection available. Azure Speech Service requires internet connectivity.",
+                            ErrorType = ValidationErrorType.NetworkError
+                        };
+                    }
+
+                    // Basic credential check - try to create a recognizer
+                    // This doesn't guarantee the credentials are valid, but catches obvious errors
+                    using var audioConfig = AudioConfig.FromDefaultMicrophoneInput();
+                    using var recognizer = new SpeechRecognizer(_speechConfig, audioConfig);
+
+                    Logger.Info("Azure configuration validation passed");
+
+                    return new ValidationResult
+                    {
+                        IsValid = true,
+                        ErrorMessage = null,
+                        ErrorType = ValidationErrorType.None
+                    };
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Azure configuration validation failed", ex);
                     return new ValidationResult
                     {
                         IsValid = false,
-                        ErrorMessage = "No network connection available. Azure Speech Service requires internet connectivity.",
-                        ErrorType = ValidationErrorType.NetworkError
+                        ErrorMessage = $"Azure configuration invalid: {ex.Message}",
+                        ErrorType = ValidationErrorType.InvalidCredentials
                     };
                 }
-
-                // Basic credential check - try to create a recognizer
-                // This doesn't guarantee the credentials are valid, but catches obvious errors
-                using var audioConfig = AudioConfig.FromDefaultMicrophoneInput();
-                using var recognizer = new SpeechRecognizer(_speechConfig, audioConfig);
-
-                Logger.Info("Azure configuration validation passed");
-
-                return new ValidationResult
-                {
-                    IsValid = true,
-                    ErrorMessage = null,
-                    ErrorType = ValidationErrorType.None
-                };
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Azure configuration validation failed", ex);
-                return new ValidationResult
-                {
-                    IsValid = false,
-                    ErrorMessage = $"Azure configuration invalid: {ex.Message}",
-                    ErrorType = ValidationErrorType.InvalidCredentials
-                };
-            }
+            });
         }
 
         public bool IsAvailable()
