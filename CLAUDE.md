@@ -87,27 +87,33 @@ curl -X POST http://localhost:8000/transcribe -F "audio=@recording.webm"
 
 **Flow**: Record via MediaRecorder → Create audio blob → POST to `/transcribe` → Display transcription with metadata (language, duration)
 
-### Windows Tray App (C# WPF .NET 8) - Standalone
-- **App.xaml.cs**: Application lifecycle, service initialization, hotkey event handling
-- **Core/Services**:
-  - `LocalTranscriptionService` (sherpa-onnx - local ONNX model inference, no network required)
+### Windows Tray App (C# WPF .NET 8) - Multi-Provider Architecture
+- **App.xaml.cs**: Application lifecycle, service initialization, hotkey event handling, factory-based provider selection
+- **Core/Services/Transcription**: Multi-provider transcription architecture
+  - `ITranscriptionService` (Interface for all transcription providers)
+  - `TranscriptionServiceFactory` (Factory pattern for runtime provider selection)
+  - `LocalTranscriptionService` (sherpa-onnx - offline ONNX model inference, no network required)
+  - `AzureTranscriptionService` (Azure Speech SDK - cloud-based recognition, 100+ languages)
+- **Core/Services** (Other services):
   - `GlobalHotkeyService` (NHotkey.Wpf - RegisterHotKey API, no admin needed)
   - `AudioRecordingService` (NAudio - 16kHz WAV recording from Windows devices)
   - `TextInjectionService` (Win32 SendInput API via P/Invoke, clipboard fallback)
   - `SettingsService` (JSON persistence in %APPDATA%)
 - **UI/TrayIcon**: System tray icon with state-based visuals (idle/recording/processing)
-- **UI/Windows/SettingsWindow**: GUI for hotkey and device configuration
+- **UI/Windows/SettingsWindow**: GUI for hotkey, device, and transcription provider configuration
 - **Models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8**: Bundled ONNX model files (~640MB)
 
 **Key Features**:
-- **Offline transcription** - No backend or internet required
+- **Multi-Provider Transcription** - Choose between Local (offline) or Azure (cloud)
+  - **Local Provider**: sherpa-onnx ONNX Runtime, no internet required, 25 European languages
+  - **Azure Provider**: Azure Speech SDK, requires subscription, 100+ languages with auto-detection
 - Global hotkey toggle (default: Ctrl+Shift+Space)
 - Automatic text injection into focused window
 - Device selection from Windows audio devices
 - Tray icon color changes by state
-- CPU-only inference (works on all Windows machines)
+- Flexible architecture for adding future providers (Google Cloud, AWS, OpenAI Whisper)
 
-**Flow**: Hotkey pressed → NAudio records WAV → Local ONNX transcription → SendInput injects text → Cleanup temp files
+**Flow**: Hotkey pressed → NAudio records WAV → Selected provider transcribes (Local ONNX or Azure SDK) → SendInput injects text → Cleanup temp files
 
 ### Data Flow
 ```
@@ -177,17 +183,27 @@ wpf-client/
   README.md              # WPF client documentation
 ```
 
-## WPF Client Notes (Standalone)
+## WPF Client Notes (Multi-Provider)
 
 - **Prerequisites**: .NET 8.0 SDK, Visual Studio 2022, icon files (see wpf-client/SpeechToTextTray/Resources/Icons/README.md)
-- **NuGet Packages**: Hardcodet.NotifyIcon.Wpf, NHotkey.Wpf, NAudio 2.2.1, org.k2fsa.sherpa.onnx 1.12.15
-- **Model Files**: Bundled in Models/ directory (~640MB), copied to output directory on build
-- **Model Info**: sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 (INT8 quantized ONNX)
-- **Transcription**: Local CPU-only inference using sherpa-onnx (no network required)
+- **NuGet Packages**:
+  - Hardcodet.NotifyIcon.Wpf (system tray)
+  - NHotkey.Wpf (global hotkeys)
+  - NAudio 2.2.1 (audio recording)
+  - org.k2fsa.sherpa.onnx 1.12.15 (local ONNX transcription)
+  - Microsoft.CognitiveServices.Speech 1.43.0 (Azure Speech SDK)
+- **Transcription Providers**:
+  - **Local (Default)**: sherpa-onnx CPU-only inference, no network required, 25 European languages
+    - Model: sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8 (INT8 quantized ONNX, ~640MB)
+    - Model Location: Bundled in Models/ directory, copied to output on build
+  - **Azure Speech Service (Optional)**: Cloud-based recognition, requires subscription & internet
+    - Supports 100+ languages with automatic language detection
+    - Requires Azure subscription key and region configuration
+    - Get started: https://azure.microsoft.com/services/cognitive-services/speech-services/
 - **Settings Location**: %APPDATA%\SpeechToTextTray\settings.json
 - **Logs**: %APPDATA%\SpeechToTextTray\logs\app_YYYYMMDD.log
 - **Temp Files**: %TEMP%\SpeechToTextTray\ (auto-cleanup keeps last 10)
 - **Text Injection**: Multi-tier approach (SendInput → SendKeys → Clipboard)
 - **No Admin Required**: Uses RegisterHotKey API (not low-level hooks)
-- **No Backend Required**: Completely standalone, no Python dependencies
+- **Extensible Design**: Easy to add future providers (Google Cloud, AWS, OpenAI Whisper) via ITranscriptionService interface
 - **Elevated Apps**: Text injection may fail for apps running as Administrator (clipboard fallback works)

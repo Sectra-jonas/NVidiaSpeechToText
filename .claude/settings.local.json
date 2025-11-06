@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:k2-fsa.github.io)",
+      "Bash(tar:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,21 +1,24 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using SherpaOnnx;
 using SpeechToTextTray.Core.Models;
 using NAudio.Wave;
 
-namespace SpeechToTextTray.Core.Services
+namespace SpeechToTextTray.Core.Services.Transcription
 {
     /// <summary>
     /// Local transcription service using sherpa-onnx with NVIDIA Parakeet model
     /// </summary>
-    public class LocalTranscriptionService : IDisposable
+    public class LocalTranscriptionService : ITranscriptionService
     {
         private readonly OfflineRecognizer _recognizer;
         private readonly string _modelPath;
         private bool _disposed = false;
+
+        public TranscriptionProvider Provider => TranscriptionProvider.Local;
 
         public LocalTranscriptionService(string? modelPath = null)
         {
@@ -75,8 +78,11 @@ namespace SpeechToTextTray.Core.Services
         /// Transcribe an audio file
         /// </summary>
         /// <param name="audioFilePath">Path to the audio file (WAV, WebM, MP3, etc.)</param>
+        /// <param name="cancellationToken">Cancellation token for async operation</param>
         /// <returns>Transcription response with text and metadata</returns>
-        public async Task<TranscriptionResponse> TranscribeAsync(string audioFilePath)
+        public async Task<TranscriptionResponse> TranscribeAsync(
+            string audioFilePath,
+            CancellationToken cancellationToken = default)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(LocalTranscriptionService));
@@ -85,7 +91,7 @@ namespace SpeechToTextTray.Core.Services
                 throw new FileNotFoundException("Audio file not found", audioFilePath);
 
             // Run transcription on a background thread to avoid blocking UI
-            return await Task.Run(() => Transcribe(audioFilePath));
+            return await Task.Run(() => Transcribe(audioFilePath), cancellationToken);
         }
 
         private TranscriptionResponse Transcribe(string audioFilePath)
@@ -164,7 +170,23 @@ namespace SpeechToTextTray.Core.Services
                     Text = text,
                     Language = language,
                     AudioDuration = duration,
-                    OriginalFilename = Path.GetFileName(audioFilePath)
+                    OriginalFilename = Path.GetFileName(audioFilePath),
+                    Provider = TranscriptionProvider.Local,
+                    ErrorMessage = null
+                };
+            }
+            catch (Exception ex)
+            {
+                return new TranscriptionResponse
+                {
+                    Success = false,
+                    Text = "",
+                    Language = "unknown",
+                    AudioDuration = 0,
+                    OriginalFilename = Path.GetFileName(audioFilePath),
+                    Provider = TranscriptionProvider.Local,
+                    ErrorMessage = ex.Message,
+                    Exception = ex
                 };
             }
             finally
@@ -207,16 +229,77 @@ namespace SpeechToTextTray.Core.Services
         }
 
         /// <summary>
-        /// Get model information
+        /// Get provider information
         /// </summary>
-        public ModelInfo GetModelInfo()
+        public TranscriptionProviderInfo GetProviderInfo()
         {
-            return new ModelInfo
+            return new TranscriptionProviderInfo
             {
-                ModelName = "nvidia/parakeet-tdt-0.6b-v3 (ONNX INT8)",
-                Device = "CPU",
-                Status = _disposed ? "Disposed" : "Ready"
+                Provider = TranscriptionProvider.Local,
+                ProviderName = "Local (sherpa-onnx)",
+                Version = "Parakeet-TDT-0.6b-v3 (INT8 ONNX)",
+                Status = _disposed ? "Disposed" : "Ready",
+                RequiresNetwork = false,
+                RequiresCredentials = false,
+                SupportedLanguages = new[] { "25 European languages" },
+                Description = "Offline CPU-based transcription using NVIDIA Parakeet model"
             };
+        }
+
+        /// <summary>
+        /// Validate configuration (model files exist)
+        /// </summary>
+        public async Task<ValidationResult> ValidateConfigurationAsync()
+        {
+            return await Task.Run(() =>
+            {
+                if (!Directory.Exists(_modelPath))
+                {
+                    return new ValidationResult
+                    {
+                        IsValid = false,
+                        ErrorMessage = $"Model directory not found: {_modelPath}",
+                        ErrorType = ValidationErrorType.ModelNotFound
+                    };
+                }
+
+                var requiredFiles = new[]
+                {
+                    "encoder.int8.onnx",
+                    "decoder.int8.onnx",
+                    "joiner.int8.onnx",
+                    "tokens.txt"
+                };
+
+                foreach (var file in requiredFiles)
+                {
+                    var filePath = Path.Combine(_modelPath, file);
+                    if (!File.Exists(filePath))
+                    {
+                        return new ValidationResult
+                        {
+                            IsValid = false,
+                            ErrorMessage = $"Required model file not found: {file}",
+                            ErrorType = ValidationErrorType.ModelNotFound
+                        };
+                    }
+                }
+
+                return new ValidationResult
+                {
+                    IsValid = true,
+                    ErrorMessage = null,
+                    ErrorType = ValidationErrorType.None
+                };
+            });
+        }
+
+        /// <summary>
+        /// Check if service is available (model files exist)
+        /// </summary>
+        public bool IsAvailable()
+        {
+            return Directory.Exists(_modelPath) && !_disposed;
         }
 
         public void Dispose()

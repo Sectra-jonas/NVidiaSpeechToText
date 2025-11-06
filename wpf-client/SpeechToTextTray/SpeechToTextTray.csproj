@@ -29,6 +29,9 @@
 
     <!-- Speech Recognition (ONNX Runtime) -->
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.12.15" />
+
+    <!-- Azure Speech SDK -->
+    <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.43.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@ using System.Windows;
 using SpeechToTextTray.Core.Helpers;
 using SpeechToTextTray.Core.Models;
 using SpeechToTextTray.Core.Services;
+using SpeechToTextTray.Core.Services.Transcription;
 using SpeechToTextTray.UI.TrayIcon;
 using SpeechToTextTray.UI.Windows;
 using SpeechToTextTray.Utils;
@@ -18,7 +19,7 @@ namespace SpeechToTextTray
         private TrayIconManager _trayIcon = null!;
         private GlobalHotkeyService _hotkeyService = null!;
         private AudioRecordingService _audioService = null!;
-        private LocalTranscriptionService _transcriptionService = null!;
+        private ITranscriptionService _transcriptionService = null!;
         private TextInjectionService _textInjection = null!;
         private SettingsService _settingsService = null!;
         private TempFileManager _tempFileManager = null!;
@@ -79,11 +80,23 @@ namespace SpeechToTextTray
 
             // Core services
             _audioService = new AudioRecordingService();
-            _transcriptionService = new LocalTranscriptionService();
             _textInjection = new TextInjectionService(_settings.FallbackToClipboard);
             _hotkeyService = new GlobalHotkeyService();
             _tempFileManager = new TempFileManager();
             _notificationHelper = new NotificationHelper(_settings.ShowNotifications);
+
+            // Initialize transcription service using factory
+            try
+            {
+                _transcriptionService = TranscriptionServiceFactory.Create(_settings.Transcription);
+                var providerInfo = _transcriptionService.GetProviderInfo();
+                Logger.Info($"Transcription service initialized: {providerInfo.ProviderName} ({providerInfo.Status})");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to initialize transcription service", ex);
+                throw new InvalidOperationException($"Failed to initialize transcription service: {ex.Message}", ex);
+            }
 
             // Initialize audio device (pre-opens device to eliminate capture delay)
             _audioService.Initialize(_settings.AudioDeviceId);
@@ -92,7 +105,7 @@ namespace SpeechToTextTray
             // Subscribe to hotkey events
             _hotkeyService.HotkeyPressed += OnHotkeyPressed;
 
-            Logger.Info("Services initialized (Local transcription)");
+            Logger.Info($"Services initialized ({_settings.Transcription.Provider} transcription)");
         }
 
         private void InitializeTrayIcon()
@@ -224,8 +237,9 @@ namespace SpeechToTextTray
 
             try
             {
-                // Transcribe locally
-                Logger.Info("Transcribing audio locally...");
+                // Transcribe using selected provider
+                var providerInfo = _transcriptionService.GetProviderInfo();
+                Logger.Info($"Transcribing audio using {providerInfo.ProviderName}...");
                 var result = await _transcriptionService.TranscribeAsync(_currentRecordingPath);
 
                 Logger.Info($"Transcription received: {result.Text.Length} characters, Language: {result.Language}");
@@ -326,6 +340,26 @@ namespace SpeechToTextTray
 
             // Update notification helper
             _notificationHelper = new NotificationHelper(_settings.ShowNotifications);
+
+            // Recreate transcription service if provider changed
+            try
+            {
+                var oldService = _transcriptionService;
+                _transcriptionService = TranscriptionServiceFactory.Create(_settings.Transcription);
+                var providerInfo = _transcriptionService.GetProviderInfo();
+                Logger.Info($"Transcription service updated: {providerInfo.ProviderName}");
+
+                // Dispose old service
+                oldService?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to update transcription service", ex);
+                _trayIcon?.ShowNotification(
+                    "Transcription Service Error",
+                    $"Failed to update transcription service: {ex.Message}",
+                    Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+            }
 
             Logger.Info("Settings applied");
         }

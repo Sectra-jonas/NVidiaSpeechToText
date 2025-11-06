@@ -1,9 +1,10 @@
+using System;
 using System.Text.Json.Serialization;
 
 namespace SpeechToTextTray.Core.Models
 {
     /// <summary>
-    /// Response model from the FastAPI backend /transcribe endpoint
+    /// Response model from transcription services (local or cloud-based)
     /// </summary>
     public class TranscriptionResponse
     {
@@ -21,6 +22,24 @@ namespace SpeechToTextTray.Core.Models
 
         [JsonPropertyName("original_filename")]
         public required string OriginalFilename { get; set; }
+
+        /// <summary>
+        /// Error message if transcription failed
+        /// </summary>
+        [JsonPropertyName("error_message")]
+        public string? ErrorMessage { get; set; }
+
+        /// <summary>
+        /// Provider that performed the transcription
+        /// </summary>
+        [JsonPropertyName("provider")]
+        public TranscriptionProvider Provider { get; set; }
+
+        /// <summary>
+        /// Exception details (not serialized, for internal use)
+        /// </summary>
+        [JsonIgnore]
+        public Exception? Exception { get; set; }
     }
 
     /// <summary>

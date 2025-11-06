@@ -1,10 +1,15 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Navigation;
 using SpeechToTextTray.Core.Models;
 using SpeechToTextTray.Core.Services;
+using SpeechToTextTray.Core.Services.Transcription;
 using SpeechToTextTray.Utils;
 
 namespace SpeechToTextTray.UI.Windows
@@ -17,6 +22,7 @@ namespace SpeechToTextTray.UI.Windows
         private readonly SettingsService _settingsService;
         private readonly AudioRecordingService _audioService;
         private AppSettings _currentSettings;
+        private TranscriptionProvider _selectedProvider;
 
         public AppSettings? UpdatedSettings { get; private set; }
         public bool SettingsChanged { get; private set; }
@@ -52,6 +58,56 @@ namespace SpeechToTextTray.UI.Windows
             fallbackClipboardCheck.IsEnabled = injectTextCheck.IsChecked ?? false;
             injectTextCheck.Checked += (s, e) => fallbackClipboardCheck.IsEnabled = true;
             injectTextCheck.Unchecked += (s, e) => fallbackClipboardCheck.IsEnabled = false;
+
+            // Load transcription settings
+            _selectedProvider = _currentSettings.Transcription.Provider;
+
+            if (_selectedProvider == TranscriptionProvider.Local)
+            {
+                localProviderRadio.IsChecked = true;
+            }
+            else if (_selectedProvider == TranscriptionProvider.Azure)
+            {
+                azureProviderRadio.IsChecked = true;
+                LoadAzureSettings(_currentSettings.Transcription.Azure);
+            }
+
+            UpdateProviderPanelVisibility();
+        }
+
+        private void LoadAzureSettings(AzureTranscriptionConfig config)
+        {
+            if (config == null) return;
+
+            // Set subscription key
+            azureKeyInput.Text = config.SubscriptionKey;
+
+            // Select region
+            foreach (ComboBoxItem item in azureRegionCombo.Items)
+            {
+                if (item.Tag?.ToString() == config.Region)
+                {
+                    azureRegionCombo.SelectedItem = item;
+                    break;
+                }
+            }
+
+            // Select language
+            if (!string.IsNullOrEmpty(config.Language))
+            {
+                foreach (ComboBoxItem item in azureLanguageCombo.Items)
+                {
+                    if (item.Tag?.ToString() == config.Language)
+                    {
+                        azureLanguageCombo.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                azureLanguageCombo.SelectedIndex = 0; // Auto-detect
+            }
         }
 
         private void LoadAudioDevices()
@@ -114,8 +170,28 @@ namespace SpeechToTextTray.UI.Windows
                     ShowNotifications = showNotificationsCheck.IsChecked ?? true,
                     InjectTextAutomatically = injectTextCheck.IsChecked ?? true,
                     FallbackToClipboard = fallbackClipboardCheck.IsChecked ?? true,
-                    PlaySoundEffects = playSoundsCheck.IsChecked ?? false
+                    PlaySoundEffects = playSoundsCheck.IsChecked ?? false,
+                    Transcription = new TranscriptionConfig
+                    {
+                        Provider = _selectedProvider,
+                        Local = _currentSettings.Transcription.Local, // Keep existing local config
+                        Azure = _selectedProvider == TranscriptionProvider.Azure
+                            ? CreateAzureConfigFromUI()
+                            : _currentSettings.Transcription.Azure
+                    }
                 };
+
+                // Validate transcription configuration
+                var validation = TranscriptionServiceFactory.ValidateConfiguration(UpdatedSettings.Transcription);
+                if (!validation.IsValid)
+                {
+                    MessageBox.Show(
+                        $"Transcription configuration error:\n\n{validation.ErrorMessage}",
+                        "Validation Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
 
                 // Save to file
                 _settingsService.SaveSettings(UpdatedSettings);
@@ -154,6 +230,130 @@ namespace SpeechToTextTray.UI.Windows
             {
                 _currentSettings = _settingsService.GetDefaultSettings();
                 LoadSettings();
+            }
+        }
+
+        private void OnProviderChanged(object sender, RoutedEventArgs e)
+        {
+            if (localProviderRadio.IsChecked == true)
+            {
+                _selectedProvider = TranscriptionProvider.Local;
+            }
+            else if (azureProviderRadio.IsChecked == true)
+            {
+                _selectedProvider = TranscriptionProvider.Azure;
+            }
+
+            UpdateProviderPanelVisibility();
+        }
+
+        private void UpdateProviderPanelVisibility()
+        {
+            if (azureConfigPanel != null)
+            {
+                azureConfigPanel.Visibility = _selectedProvider == TranscriptionProvider.Azure
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+        }
+
+        private async void TestAzureConnection_Click(object sender, RoutedEventArgs e)
+        {
+            // Disable button during test
+            testConnectionButton.IsEnabled = false;
+            azureStatusText.Text = "Testing...";
+            azureStatusIndicator.Fill = new SolidColorBrush(Colors.Orange);
+
+            try
+            {
+                var testConfig = CreateAzureConfigFromUI();
+
+                // Validate configuration first
+                var validation = TranscriptionServiceFactory.ValidateConfiguration(
+                    new TranscriptionConfig { Provider = TranscriptionProvider.Azure, Azure = testConfig });
+
+                if (!validation.IsValid)
+                {
+                    azureStatusText.Text = "Configuration invalid";
+                    azureStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                    MessageBox.Show(
+                        $"Configuration invalid:\n\n{validation.ErrorMessage}",
+                        "Validation Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Try to create service
+                using (var testService = new AzureTranscriptionService(testConfig))
+                {
+                    var serviceValidation = await testService.ValidateConfigurationAsync();
+
+                    if (serviceValidation.IsValid)
+                    {
+                        azureStatusText.Text = "Connection successful";
+                        azureStatusIndicator.Fill = new SolidColorBrush(Colors.Green);
+                        MessageBox.Show(
+                            "Azure Speech Service connection successful!",
+                            "Test Connection",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        azureStatusText.Text = "Connection failed";
+                        azureStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                        MessageBox.Show(
+                            $"Connection failed:\n\n{serviceValidation.ErrorMessage}",
+                            "Test Connection",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Error);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Azure connection test failed", ex);
+                azureStatusText.Text = "Test failed";
+                azureStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                MessageBox.Show(
+                    $"Test failed:\n\n{ex.Message}",
+                    "Test Connection",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                testConnectionButton.IsEnabled = true;
+            }
+        }
+
+        private AzureTranscriptionConfig CreateAzureConfigFromUI()
+        {
+            var language = (azureLanguageCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+
+            return new AzureTranscriptionConfig
+            {
+                SubscriptionKey = azureKeyInput.Text.Trim(),
+                Region = (azureRegionCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "eastus",
+                Language = string.IsNullOrWhiteSpace(language) ? null : language
+            };
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = e.Uri.AbsoluteUri,
+                    UseShellExecute = true
+                });
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to open hyperlink", ex);
             }
         }
     }

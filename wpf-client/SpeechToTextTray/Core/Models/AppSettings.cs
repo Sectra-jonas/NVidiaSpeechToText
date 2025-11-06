@@ -45,6 +45,11 @@ namespace SpeechToTextTray.Core.Models
         /// Whether to play sound effects on start/stop recording
         /// </summary>
         public bool PlaySoundEffects { get; set; } = false;
+
+        /// <summary>
+        /// Transcription provider settings
+        /// </summary>
+        public TranscriptionConfig Transcription { get; set; } = new TranscriptionConfig();
     }
 
     /// <summary>

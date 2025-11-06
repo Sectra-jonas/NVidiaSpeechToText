@@ -8,12 +8,14 @@ A Windows 11 system tray application for real-time speech-to-text transcription 
 - 🎤 **Audio Device Selection**: Choose from any Windows recording device
 - ⚡ **Automatic Text Injection**: Transcribed text is automatically inserted into the focused window
 - 🔔 **Visual Indicators**: System tray icon changes color based on state (idle/recording/processing)
-- ⚙️ **GUI Configuration**: User-friendly settings window
+- ⚙️ **GUI Configuration**: User-friendly settings window with provider selection
 - 🔄 **Clipboard Fallback**: Automatically copies to clipboard if text injection fails
 - 📝 **Logging**: Detailed logs for debugging and troubleshooting
-- 🏠 **Offline Transcription**: All processing happens locally using sherpa-onnx ONNX Runtime
-- 🌍 **25 Languages**: Supports 25 European languages with automatic detection
-- ⚙️ **CPU-Only**: Works on all Windows machines without GPU requirements
+- 🔌 **Multi-Provider Support**: Choose your transcription provider
+  - **Local (Default)**: Offline ONNX transcription using sherpa-onnx, 25 European languages, no internet required
+  - **Azure Speech Service**: Cloud-based recognition, 100+ languages with auto-detection, requires subscription
+- ⚙️ **CPU-Only (Local)**: Local provider works on all Windows machines without GPU requirements
+- 🔮 **Extensible**: Easy to add future providers (Google Cloud, AWS, OpenAI Whisper)
 
 ## Prerequisites
 
@@ -25,10 +27,11 @@ A Windows 11 system tray application for real-time speech-to-text transcription 
 ### System Requirements
 - Microphone/audio input device
 - Minimum 4GB RAM (8GB recommended)
-- ~1GB disk space (640MB for ONNX model)
+- ~1GB disk space (640MB for local ONNX model)
 - Windows with .NET 8.0 runtime installed
-- **No GPU required** - runs on CPU
-- **No internet required** - fully offline after installation
+- **No GPU required** - local provider runs on CPU
+- **Internet optional** - Local provider works offline; Azure provider requires internet connection
+- **Azure Subscription (Optional)** - Required only if using Azure Speech Service provider
 
 ## Installation
 
@@ -136,6 +139,38 @@ Settings are stored in: `%APPDATA%\SpeechToTextTray\settings.json`
 4. Click "Save"
 
 **Note**: If the hotkey is already in use by another application, registration will fail and a warning notification will appear.
+
+### Configuring Transcription Provider
+
+The application supports two transcription providers:
+
+#### Local Provider (Default)
+- **No configuration required** - works out of the box
+- Offline transcription using bundled ONNX model
+- Supports 25 European languages
+- No internet or subscription required
+
+#### Azure Speech Service Provider
+1. **Get Azure Subscription**:
+   - Visit [Azure Speech Service](https://azure.microsoft.com/services/cognitive-services/speech-services/)
+   - Create a Speech resource in Azure Portal
+   - Copy your subscription key and region
+
+2. **Configure in Settings**:
+   - Open Settings window (right-click tray icon → Settings)
+   - Select "Azure Speech Service (Cloud)" provider
+   - Enter your subscription key
+   - Select your Azure region (e.g., "East US", "West Europe")
+   - (Optional) Select a specific language or leave as "Auto-detect"
+   - Click "Test" to verify connection
+   - Click "Save"
+
+3. **Requirements**:
+   - Active internet connection
+   - Valid Azure subscription key
+   - Correct Azure region selected
+
+**Note**: Azure Speech Service may incur costs based on usage. Check Azure pricing for details.
 
 ## Architecture
 
