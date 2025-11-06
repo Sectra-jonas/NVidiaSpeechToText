@@ -29,8 +29,11 @@ namespace SpeechToTextTray.Core.Services
         [DllImport("user32.dll")]
         private static extern IntPtr GetFocus();
 
-        [DllImport("user32.dll")]
+        [DllImport("user32.dll", SetLastError = true)]
         private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetLastError();
 
         [StructLayout(LayoutKind.Sequential)]
         private struct INPUT
@@ -39,11 +42,15 @@ namespace SpeechToTextTray.Core.Services
             public INPUTUNION union;
         }
 
-        [StructLayout(LayoutKind.Explicit)]
+        [StructLayout(LayoutKind.Explicit, Size = 28)]
         private struct INPUTUNION
         {
             [FieldOffset(0)]
+            public MOUSEINPUT mi;
+            [FieldOffset(0)]
             public KEYBDINPUT ki;
+            [FieldOffset(0)]
+            public HARDWAREINPUT hi;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -54,6 +61,25 @@ namespace SpeechToTextTray.Core.Services
             public uint dwFlags;
             public uint time;
             public IntPtr dwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MOUSEINPUT
+        {
+            public int dx;
+            public int dy;
+            public uint mouseData;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct HARDWAREINPUT
+        {
+            public uint uMsg;
+            public ushort wParamL;
+            public ushort wParamH;
         }
 
         private const uint INPUT_KEYBOARD = 1;
@@ -155,6 +181,13 @@ namespace SpeechToTextTray.Core.Services
         /// </summary>
         private bool SendInputMethod(string text)
         {
+            // Log structure sizes for diagnostics
+            int inputSize = Marshal.SizeOf(typeof(INPUT));
+            int unionSize = Marshal.SizeOf(typeof(INPUTUNION));
+            int keySize = Marshal.SizeOf(typeof(KEYBDINPUT));
+
+            System.Diagnostics.Debug.WriteLine($"SendInput structure sizes: INPUT={inputSize}, INPUTUNION={unionSize}, KEYBDINPUT={keySize}");
+
             // Create input array (key down + key up for each character)
             var inputs = new INPUT[text.Length * 2];
             int index = 0;
@@ -197,8 +230,18 @@ namespace SpeechToTextTray.Core.Services
             }
 
             // Send the inputs
-            uint result = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
-            return result == inputs.Length;
+            System.Diagnostics.Debug.WriteLine($"Calling SendInput with {inputs.Length} inputs, structure size={inputSize}");
+            uint result = SendInput((uint)inputs.Length, inputs, inputSize);
+
+            if (result != inputs.Length)
+            {
+                uint error = GetLastError();
+                System.Diagnostics.Debug.WriteLine($"SendInput FAILED: Expected {inputs.Length}, got {result}, LastError={error} (0x{error:X})");
+                return false;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"SendInput SUCCESS: Sent {result} inputs");
+            return true;
         }
 
         /// <summary>
