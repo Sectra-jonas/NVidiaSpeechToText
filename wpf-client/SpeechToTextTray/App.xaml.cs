@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Windows;
 using SpeechToTextTray.Core.Helpers;
 using SpeechToTextTray.Core.Models;
@@ -30,6 +31,9 @@ namespace SpeechToTextTray
         private AppSettings _settings = null!;
         private RecordingState _currentState = RecordingState.Idle;
         private string _currentRecordingPath = null!;
+
+        // Synchronization for preventing race conditions during recording toggle
+        private readonly SemaphoreSlim _stateLock = new SemaphoreSlim(1, 1);
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -206,6 +210,13 @@ namespace SpeechToTextTray
 
         private async System.Threading.Tasks.Task ToggleRecordingAsync()
         {
+            // Non-blocking lock attempt - prevents race conditions from rapid hotkey presses
+            if (!await _stateLock.WaitAsync(0))
+            {
+                Logger.Warning("Recording operation already in progress, ignoring hotkey press");
+                return;
+            }
+
             try
             {
                 if (_currentState == RecordingState.Recording)
@@ -217,6 +228,10 @@ namespace SpeechToTextTray
                 {
                     // Start recording
                     StartRecording();
+                }
+                else
+                {
+                    Logger.Warning($"Cannot toggle recording in current state: {_currentState}");
                 }
             }
             catch (Exception ex)
@@ -233,6 +248,11 @@ namespace SpeechToTextTray
                 await System.Threading.Tasks.Task.Delay(2000);
                 _currentState = RecordingState.Idle;
                 _trayIcon?.SetState(RecordingState.Idle);
+            }
+            finally
+            {
+                // Always release the lock
+                _stateLock.Release();
             }
         }
 
@@ -426,15 +446,17 @@ namespace SpeechToTextTray
             _notificationHelper = new NotificationHelper(_settings.ShowNotifications);
 
             // Recreate transcription service if provider changed
+            ITranscriptionService? oldService = null;
             try
             {
-                var oldService = _transcriptionService;
-                _transcriptionService = TranscriptionServiceFactory.Create(_settings.Transcription);
+                oldService = _transcriptionService;
+                var newService = TranscriptionServiceFactory.Create(_settings.Transcription);
+
+                // Only update reference if creation succeeded
+                _transcriptionService = newService;
+
                 var providerInfo = _transcriptionService.GetProviderInfo();
                 Logger.Info($"Transcription service updated: {providerInfo.ProviderName}");
-
-                // Dispose old service
-                oldService?.Dispose();
             }
             catch (Exception ex)
             {
@@ -443,6 +465,23 @@ namespace SpeechToTextTray
                     "Transcription Service Error",
                     $"Failed to update transcription service: {ex.Message}",
                     Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Error);
+            }
+            finally
+            {
+                // Always dispose old service, even if new service creation failed
+                // This prevents resource leaks when switching providers
+                if (oldService != null && oldService != _transcriptionService)
+                {
+                    try
+                    {
+                        oldService.Dispose();
+                        Logger.Info("Old transcription service disposed successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warning($"Failed to dispose old transcription service: {ex.Message}");
+                    }
+                }
             }
 
             Logger.Info("Settings applied");
@@ -487,6 +526,7 @@ namespace SpeechToTextTray
             _audioService?.Dispose();
             _transcriptionService?.Dispose();
             _trayIcon?.Dispose();
+            _stateLock?.Dispose();
 
             // Clean up temp files on exit (optional)
             // _tempFileManager?.CleanupAllFiles();
