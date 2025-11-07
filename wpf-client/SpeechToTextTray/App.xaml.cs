@@ -588,13 +588,20 @@ namespace SpeechToTextTray
             MessageBox.Show(
                 "Speech-to-Text Tray Application\n\n" +
                 "Version 1.0.0\n\n" +
-                "A Windows tray application for speech-to-text transcription\n" +
-                "using NVIDIA Parakeet model.\n\n" +
-                "Press your configured hotkey to start/stop recording.\n" +
-                "Transcribed text will be automatically inserted into the active window.",
+                "A Windows tray application for speech-to-text transcription with multiple provider options:\n" +
+                "• Local (NVIDIA Parakeet via sherpa-onnx)\n" +
+                "• Azure Speech Service\n" +
+                "• Azure OpenAI Whisper\n\n" +
+                "Features:\n" +
+                "• Configurable hotkey for recording\n" +
+                "• Optional Philips SpeechMike integration\n" +
+                "• Automatic text injection into active window\n\n" +
+                "Configure settings via the tray icon menu.",
                 "About Speech-to-Text",
                 MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                MessageBoxImage.Information,
+                MessageBoxResult.OK,
+                MessageBoxOptions.DefaultDesktopOnly);
         }
 
         private void OnExitRequested(object? sender, EventArgs e)
@@ -605,7 +612,9 @@ namespace SpeechToTextTray
                 "Are you sure you want to exit Speech-to-Text?",
                 "Exit Confirmation",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                MessageBoxImage.Question,
+                MessageBoxResult.No,
+                MessageBoxOptions.DefaultDesktopOnly);
 
             if (result == MessageBoxResult.Yes)
             {
