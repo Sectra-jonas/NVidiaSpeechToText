@@ -48,7 +48,6 @@ namespace SpeechToTextTray.UI.Windows
             hotkeyInput.HotkeyConfig = _currentSettings.Hotkey;
 
             // Set options
-            startWithWindowsCheck.IsChecked = _currentSettings.StartWithWindows;
             showNotificationsCheck.IsChecked = _currentSettings.ShowNotifications;
             injectTextCheck.IsChecked = _currentSettings.InjectTextAutomatically;
             fallbackClipboardCheck.IsChecked = _currentSettings.FallbackToClipboard;
@@ -205,7 +204,6 @@ namespace SpeechToTextTray.UI.Windows
                 {
                     Hotkey = hotkeyInput.HotkeyConfig,
                     AudioDeviceId = (audioDeviceCombo.SelectedItem as AudioDevice)?.Id ?? "default",
-                    StartWithWindows = startWithWindowsCheck.IsChecked ?? false,
                     ShowNotifications = showNotificationsCheck.IsChecked ?? true,
                     InjectTextAutomatically = injectTextCheck.IsChecked ?? true,
                     FallbackToClipboard = fallbackClipboardCheck.IsChecked ?? true,

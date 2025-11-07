@@ -22,11 +22,6 @@ namespace SpeechToTextTray.Core.Models
         public string AudioDeviceId { get; set; } = "default";
 
         /// <summary>
-        /// Whether to start application when Windows starts
-        /// </summary>
-        public bool StartWithWindows { get; set; } = false;
-
-        /// <summary>
         /// Whether to show Windows toast notifications
         /// </summary>
         public bool ShowNotifications { get; set; } = true;

@@ -274,8 +274,6 @@
 
                 <!-- Options Section -->
                 <Label Content="Options:" FontSize="14" Margin="0,20,0,5"/>
-                <CheckBox x:Name="startWithWindowsCheck"
-                          Content="Start with Windows"/>
                 <CheckBox x:Name="showNotificationsCheck"
                           Content="Show notifications"/>
                 <CheckBox x:Name="injectTextCheck"
