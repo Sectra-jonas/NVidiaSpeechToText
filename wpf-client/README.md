@@ -37,6 +37,11 @@ A Windows 11 system tray application for real-time speech-to-text transcription 
   - **Azure Speech Service**: Cloud-based recognition, 100+ languages with auto-detection, requires subscription
   - **Azure OpenAI Whisper**: OpenAI's Whisper model on Azure, excellent English transcription, 50+ languages with translation to English
 - ⚙️ **CPU-Only (Local)**: Local provider works on all Windows machines without GPU requirements
+- 🎙️ **Philips SpeechMike Integration**: Optional hardware button support for professional dictation devices
+  - Record/Stop button hardware integration (no keyboard hotkey needed)
+  - LED indicator syncs with recording state
+  - Automatic COM device detection and registration-free COM
+  - Enable/disable in settings
 - 🔮 **Extensible**: Easy to add future providers (Google Cloud, AWS)
 
 ## Prerequisites
@@ -60,18 +65,78 @@ A Windows 11 system tray application for real-time speech-to-text transcription 
 Want to get started immediately? Here's the 5-minute guide:
 
 1. **Install .NET 8.0 Runtime** - [Download here](https://dotnet.microsoft.com/download/dotnet/8.0)
-2. **Build or download** `SpeechToTextTray.exe` (see [Installation](#installation) below)
-3. **Run the application** - A microphone icon appears in your system tray
-4. **Press Ctrl+Shift+Space** to start recording
-5. **Speak clearly** into your microphone
-6. **Press Ctrl+Shift+Space again** to stop
-7. **Text appears automatically** in your active window!
+2. **Download ONNX model files** - See [Prerequisites: ONNX Model Files](#prerequisites-onnx-model-files) (~640MB download required)
+3. **Build or download** `SpeechToTextTray.exe` (see [Installation](#installation) below)
+4. **Run the application** - A microphone icon appears in your system tray
+5. **Press Ctrl+Shift+Space** to start recording
+6. **Speak clearly** into your microphone
+7. **Press Ctrl+Shift+Space again** to stop
+8. **Text appears automatically** in your active window!
 
 **That's it!** The local provider works offline with zero configuration. No accounts, no API keys, no internet needed.
 
 To use cloud providers or customize settings, right-click the tray icon → Settings.
 
 ## Installation
+
+### Prerequisites: ONNX Model Files
+
+**IMPORTANT:** Before building, you MUST download the ONNX model files (~640MB). The application will not work without these files.
+
+#### Download Instructions
+
+1. **Download the model archive:**
+
+   **Option A - Direct download (Recommended for Windows):**
+   - Download: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+   - Extract using 7-Zip, WinRAR, or Windows built-in extraction
+
+   **Option B - Command line (with wget/tar):**
+   ```bash
+   cd wpf-client/SpeechToTextTray
+   wget https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+   tar xvf sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+   rm sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2
+   ```
+
+2. **Place model files in correct location:**
+   - Create directory: `wpf-client/SpeechToTextTray/Models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/`
+   - Copy these 4 files from the extracted archive into the directory:
+     - `encoder.int8.onnx` (~622MB)
+     - `decoder.int8.onnx` (~12MB)
+     - `joiner.int8.onnx` (~6MB)
+     - `tokens.txt` (~92KB)
+
+3. **Verify files are in correct location:**
+   ```
+   SpeechToTextTray/
+   └── Models/
+       └── sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/
+           ├── encoder.int8.onnx
+           ├── decoder.int8.onnx
+           ├── joiner.int8.onnx
+           └── tokens.txt
+   ```
+
+**Total size:** ~640MB
+
+**Why separate download?**
+- Git repositories have file size limits (GitHub max: 100MB per file)
+- Model files are too large to commit to version control
+- Allows users to update models independently of application code
+- Keeps repository size small and clone times fast
+
+**Model Information:**
+- **Model**: NVIDIA NeMo Parakeet-TDT 0.6b v3 (INT8 quantized)
+- **Languages**: 25 European languages with automatic language detection
+- **Source**: sherpa-onnx project (Next-gen Kaldi)
+- **License**: See sherpa-onnx repository for model license details
+
+**Troubleshooting:**
+- If app crashes on startup with "Model directory not found" error, verify model files are in `Models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/`
+- If app crashes with "Encoder/Decoder/Joiner model not found" error, verify all 4 files exist
+- Model files are automatically copied to output directory during build (configured in `.csproj`)
+- Check logs in `%APPDATA%\SpeechToTextTray\logs\` for detailed error messages
 
 ### Option 1: Build from Source
 
@@ -163,11 +228,10 @@ Settings are stored in: `%APPDATA%\SpeechToTextTray\settings.json`
 |---------|-------------|---------|
 | **Hotkey** | Global keyboard shortcut to toggle recording | Ctrl + Shift + Space |
 | **Audio Device** | Microphone/input device ID | Default device |
-| **Start with Windows** | Launch on Windows startup | False |
 | **Show Notifications** | Display toast notifications | True |
 | **Auto-inject Text** | Automatically insert transcribed text | True |
 | **Fallback to Clipboard** | Copy to clipboard if injection fails | True |
-| **Play Sound Effects** | Audio feedback on recording start/stop | False |
+| **Enable SpeechMike** | Enable Philips SpeechMike hardware button integration | False |
 
 ### Changing the Hotkey
 
@@ -177,6 +241,44 @@ Settings are stored in: `%APPDATA%\SpeechToTextTray\settings.json`
 4. Click "Save"
 
 **Note**: If the hotkey is already in use by another application, registration will fail and a warning notification will appear.
+
+### Philips SpeechMike Integration
+
+The application supports optional integration with Philips SpeechMike professional dictation devices.
+
+**Features:**
+- Hardware Record/Stop button triggers recording (no keyboard hotkey needed)
+- LED indicator on device syncs with recording state (red when recording)
+- Automatic device detection at startup
+- Works alongside keyboard hotkey - both methods can be used
+
+**Requirements:**
+- Philips SpeechMike device (tested with SpeechMike Premium)
+- Device drivers installed (usually automatic via Windows Update)
+- 64-bit Windows (registration-free COM components included)
+
+**Configuration:**
+1. Open Settings window (right-click tray icon → Settings)
+2. Check "Enable SpeechMike integration"
+3. Click "Save"
+4. If device is connected, you'll see a log message: "SpeechMike integration enabled"
+5. If device is not found, integration will be disabled (no error - it's optional)
+
+**Usage:**
+- Press the **Record button** on your SpeechMike to start recording
+- LED turns red to indicate recording
+- Press **Record button again** or **Stop button** to stop recording
+- LED turns off when idle
+- Keyboard hotkey continues to work normally
+
+**Troubleshooting:**
+- If SpeechMike buttons don't work, verify device is connected and drivers are installed
+- Check Windows Device Manager for "Philips SpeechMike" under "Human Interface Devices"
+- Restart application after connecting device
+- Check logs in `%APPDATA%\SpeechToTextTray\logs\` for device detection messages
+- If you don't have a SpeechMike, simply leave the checkbox unchecked
+
+**Note**: SpeechMike integration is completely optional. The application works perfectly without it using keyboard hotkeys.
 
 ### Choosing a Provider
 
@@ -267,19 +369,29 @@ The application supports three transcription providers:
 
 ### API Key Storage
 
-**⚠️ IMPORTANT:** API keys for Azure providers are stored in **plain text** in your settings file.
+**🔒 SECURE:** API keys for Azure providers are encrypted using Windows Data Protection API (DPAPI).
 
 - **File Location**: `%APPDATA%\SpeechToTextTray\settings.json`
-- **Risk**: Anyone with access to your Windows user account can read your API keys
-- **Future**: Encryption is planned for a future release (see code comments in `TranscriptionConfig.cs`)
+- **Encryption**: Uses Windows DPAPI with user-specific, machine-bound encryption
+- **Protection**: API keys can only be decrypted by the same Windows user account on the same machine
+- **Storage Format**: Keys stored as encrypted Base64 strings prefixed with `encrypted:`
+- **Fallback**: Legacy plain text keys are automatically upgraded to encrypted format on save
+
+**Security Benefits:**
+- ✅ API keys are **not stored in plain text**
+- ✅ **Machine and user-specific** - keys cannot be moved to another computer
+- ✅ **No master password needed** - managed by Windows
+- ✅ **Transparent encryption** - automatically encrypted on save, decrypted on load
 
 **Recommendations:**
-- ✅ **Do NOT share** your `settings.json` file with others
-- ✅ **Protect** your Windows user account with a strong password
+- ✅ **Do NOT share** your `settings.json` file with others (even encrypted, it may expose other settings)
+- ✅ **Protect** your Windows user account with a strong password (DPAPI relies on Windows account security)
 - ✅ **Use separate Azure subscriptions** for development and production
 - ✅ **Monitor your Azure billing** regularly for unexpected usage
 - ✅ **Revoke and regenerate** API keys if you suspect compromise
 - ❌ **Do NOT commit** settings.json to version control systems
+
+**Note**: If you move settings.json to another computer or Windows user account, encrypted API keys will fail to decrypt and will need to be re-entered.
 
 ### Cloud Provider Costs
 
@@ -621,10 +733,11 @@ Release build is optimized and located in: `bin\Release\net8.0-windows\`
    - **Typical**: ~3 minutes at 16kHz mono WAV ≈ 3MB, so rarely an issue
    - **Workaround**: Keep recordings under 10 minutes to stay well below limit
 
-6. **API Keys Stored in Plain Text**: Security consideration for Azure providers
-   - **Risk**: Anyone with access to `%APPDATA%\SpeechToTextTray\settings.json` can read keys
-   - **Mitigation**: Protect your Windows account, don't share settings file
-   - **Future**: Encryption planned for future release
+6. **API Key Encryption - Machine and User Bound**: Azure provider API keys are encrypted with DPAPI
+   - **Behavior**: Encrypted keys only work on the same machine and Windows user account
+   - **Settings File Portability**: If you copy settings.json to another computer or user, encrypted API keys will fail to decrypt
+   - **Solution**: Re-enter your API keys in Settings window on the new machine/user account
+   - **Security**: Keys are protected by Windows DPAPI - no plain text storage
 
 7. **Antivirus False Positives**: Some AV software may flag SendInput usage
    - **Reason**: Win32 SendInput API can be used maliciously (we use it legitimately)
@@ -640,7 +753,6 @@ Release build is optimized and located in: `bin\Release\net8.0-windows\`
 
 - [ ] GPU acceleration support via CUDA
 - [ ] Windows 10 Toast Notifications integration
-- [ ] Sound effects for recording start/stop
 - [ ] Visual overlay indicator (floating window)
 - [ ] Recording history viewer
 - [ ] Custom text post-processing rules
