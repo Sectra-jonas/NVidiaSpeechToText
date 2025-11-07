@@ -119,9 +119,11 @@ namespace SpeechToTextTray.Core.Services.Transcription
             try
             {
                 // Prepare transcription options
+                // Use Simple format for compatibility with both Whisper and gpt-4o-transcribe models
+                // Note: gpt-4o-transcribe does NOT support Verbose format
                 var options = new AudioTranscriptionOptions
                 {
-                    ResponseFormat = AudioTranscriptionFormat.Verbose
+                    ResponseFormat = AudioTranscriptionFormat.Simple
                 };
 
                 // Add optional language hint
