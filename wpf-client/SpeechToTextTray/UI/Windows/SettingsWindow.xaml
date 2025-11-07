@@ -283,8 +283,6 @@
                 <CheckBox x:Name="fallbackClipboardCheck"
                           Content="Fallback to clipboard if text injection fails"
                           Margin="20,5,0,0"/>
-                <CheckBox x:Name="playSoundsCheck"
-                          Content="Play sound effects"/>
                 <CheckBox x:Name="enableSpeechMikeCheck"
                           Content="Enable SpeechMike integration"/>
             </StackPanel>

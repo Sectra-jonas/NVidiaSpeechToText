@@ -52,7 +52,6 @@ namespace SpeechToTextTray.UI.Windows
             showNotificationsCheck.IsChecked = _currentSettings.ShowNotifications;
             injectTextCheck.IsChecked = _currentSettings.InjectTextAutomatically;
             fallbackClipboardCheck.IsChecked = _currentSettings.FallbackToClipboard;
-            playSoundsCheck.IsChecked = _currentSettings.PlaySoundEffects;
             enableSpeechMikeCheck.IsChecked = _currentSettings.EnableSpeechMike;
 
             // Enable/disable fallback option based on inject text option
@@ -210,7 +209,6 @@ namespace SpeechToTextTray.UI.Windows
                     ShowNotifications = showNotificationsCheck.IsChecked ?? true,
                     InjectTextAutomatically = injectTextCheck.IsChecked ?? true,
                     FallbackToClipboard = fallbackClipboardCheck.IsChecked ?? true,
-                    PlaySoundEffects = playSoundsCheck.IsChecked ?? false,
                     EnableSpeechMike = enableSpeechMikeCheck.IsChecked ?? false,
                     Transcription = new TranscriptionConfig
                     {

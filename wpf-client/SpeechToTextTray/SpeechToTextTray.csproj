@@ -68,9 +68,4 @@
     </None>
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- Create folders for resources if they don't exist -->
-    <Folder Include="Resources\Sounds\" />
-  </ItemGroup>
-
 </Project>

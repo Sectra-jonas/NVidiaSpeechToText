@@ -42,11 +42,6 @@ namespace SpeechToTextTray.Core.Models
         public bool FallbackToClipboard { get; set; } = true;
 
         /// <summary>
-        /// Whether to play sound effects on start/stop recording
-        /// </summary>
-        public bool PlaySoundEffects { get; set; } = false;
-
-        /// <summary>
         /// Whether to enable Philips SpeechMike integration
         /// </summary>
         public bool EnableSpeechMike { get; set; } = false;
