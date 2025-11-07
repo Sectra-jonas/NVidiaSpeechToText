@@ -26,6 +26,7 @@ namespace SpeechToTextTray
         private SettingsService _settingsService = null!;
         private TempFileManager _tempFileManager = null!;
         private NotificationHelper _notificationHelper = null!;
+        private SpeechMikeService? _speechMikeService;
 
         // State
         private AppSettings _settings = null!;
@@ -138,6 +139,22 @@ namespace SpeechToTextTray
             // Subscribe to hotkey events
             _hotkeyService.HotkeyPressed += OnHotkeyPressed;
 
+            // Initialize SpeechMike if enabled
+            if (_settings.EnableSpeechMike)
+            {
+                _speechMikeService = new SpeechMikeService();
+                if (_speechMikeService.Initialize())
+                {
+                    _speechMikeService.RecordingAction += OnSpeechMikeAction;
+                    Logger.Info("SpeechMike integration enabled");
+                }
+                else
+                {
+                    _speechMikeService = null;
+                    Logger.Warning("SpeechMike enabled in settings but device not available");
+                }
+            }
+
             Logger.Info($"Services initialized ({_settings.Transcription.Provider} transcription)");
         }
 
@@ -208,6 +225,46 @@ namespace SpeechToTextTray
             }
         }
 
+        private async void OnSpeechMikeAction(object? sender, RecordingActionEventArgs e)
+        {
+            try
+            {
+                // SpeechMike button events come from COM on a background thread
+                // Must marshal to UI thread for WPF operations
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    if (e.StartRecording)
+                    {
+                        // Start recording if idle
+                        if (_currentState == RecordingState.Idle)
+                        {
+                            await ToggleRecordingAsync();
+                        }
+                        else
+                        {
+                            Logger.Info($"SpeechMike Record pressed but cannot start - current state: {_currentState}");
+                        }
+                    }
+                    else
+                    {
+                        // Stop recording if currently recording
+                        if (_currentState == RecordingState.Recording)
+                        {
+                            await ToggleRecordingAsync();
+                        }
+                        else
+                        {
+                            Logger.Info($"SpeechMike Stop triggered but not recording - current state: {_currentState}");
+                        }
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("SpeechMike action handler error", ex);
+            }
+        }
+
         private async System.Threading.Tasks.Task ToggleRecordingAsync()
         {
             // Non-blocking lock attempt - prevents race conditions from rapid hotkey presses
@@ -263,6 +320,9 @@ namespace SpeechToTextTray
             // Update state
             _currentState = RecordingState.Recording;
             _trayIcon?.SetState(RecordingState.Recording);
+
+            // Turn on SpeechMike LED indicator
+            _speechMikeService?.SetRecordingIndicator(true);
 
             // Create temp file
             _currentRecordingPath = _tempFileManager.CreateTempFilePath();
@@ -371,6 +431,9 @@ namespace SpeechToTextTray
                 // Clean up temp file
                 _tempFileManager.DeleteFile(_currentRecordingPath);
 
+                // Turn off SpeechMike LED indicator
+                _speechMikeService?.SetRecordingIndicator(false);
+
                 // Reset to idle
                 _currentState = RecordingState.Idle;
                 _trayIcon?.SetState(RecordingState.Idle);
@@ -444,6 +507,39 @@ namespace SpeechToTextTray
 
             // Update notification helper
             _notificationHelper = new NotificationHelper(_settings.ShowNotifications);
+
+            // Update SpeechMike service based on settings
+            if (_settings.EnableSpeechMike && _speechMikeService == null)
+            {
+                // Enable SpeechMike
+                _speechMikeService = new SpeechMikeService();
+                if (_speechMikeService.Initialize())
+                {
+                    _speechMikeService.RecordingAction += OnSpeechMikeAction;
+                    Logger.Info("SpeechMike integration enabled via settings");
+                    _trayIcon?.ShowNotification(
+                        "SpeechMike Enabled",
+                        "SpeechMike device is now active for recording",
+                        Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Info);
+                }
+                else
+                {
+                    _speechMikeService = null;
+                    Logger.Warning("Failed to enable SpeechMike - device not available");
+                    _trayIcon?.ShowNotification(
+                        "SpeechMike Not Available",
+                        "No SpeechMike device found. Please connect device and try again.",
+                        Hardcodet.Wpf.TaskbarNotification.BalloonIcon.Warning);
+                }
+            }
+            else if (!_settings.EnableSpeechMike && _speechMikeService != null)
+            {
+                // Disable SpeechMike
+                _speechMikeService.RecordingAction -= OnSpeechMikeAction;
+                _speechMikeService.Dispose();
+                _speechMikeService = null;
+                Logger.Info("SpeechMike integration disabled via settings");
+            }
 
             // Recreate transcription service if provider changed
             ITranscriptionService? oldService = null;
@@ -525,6 +621,7 @@ namespace SpeechToTextTray
             _hotkeyService?.Dispose();
             _audioService?.Dispose();
             _transcriptionService?.Dispose();
+            _speechMikeService?.Dispose();
             _trayIcon?.Dispose();
             _stateLock?.Dispose();
 

@@ -47,6 +47,11 @@ namespace SpeechToTextTray.Core.Models
         public bool PlaySoundEffects { get; set; } = false;
 
         /// <summary>
+        /// Whether to enable Philips SpeechMike integration
+        /// </summary>
+        public bool EnableSpeechMike { get; set; } = false;
+
+        /// <summary>
         /// Transcription provider settings
         /// </summary>
         public TranscriptionConfig Transcription { get; set; } = new TranscriptionConfig();
