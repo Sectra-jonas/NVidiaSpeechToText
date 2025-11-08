@@ -68,7 +68,7 @@
                              Checked="OnProviderChanged"/>
                 <RadioButton x:Name="azureOpenAIProviderRadio"
                              GroupName="TranscriptionProvider"
-                             Content="Azure OpenAI Whisper (Cloud)"
+                             Content="Azure OpenAI (Cloud)"
                              Margin="0,0,0,10"
                              Checked="OnProviderChanged"/>
 
@@ -216,7 +216,7 @@
                         <TextBox x:Name="azureOpenAIDeploymentInput"
                                  Height="30"
                                  Padding="5"/>
-                        <TextBlock Text="The name of your Whisper deployment in Azure OpenAI Studio"
+                        <TextBlock Text="The name of your audio transcription deployment in Azure OpenAI Studio"
                                    Foreground="Gray"
                                    FontSize="10"
                                    Margin="0,3,0,0"/>
@@ -266,7 +266,7 @@
                                    Foreground="#666666"
                                    FontSize="10"
                                    Margin="0,10,0,0">
-                            <Run Text="Azure OpenAI Whisper requires internet. 25MB file size limit. "/>
+                            <Run Text="Azure OpenAI requires internet. 25MB file size limit. "/>
                             <Hyperlink NavigateUri="https://learn.microsoft.com/en-us/azure/ai-services/openai/whisper-quickstart" RequestNavigate="Hyperlink_RequestNavigate">Get started</Hyperlink>
                         </TextBlock>
                     </StackPanel>
@@ -274,13 +274,34 @@
 
                 <!-- Options Section -->
                 <Label Content="Options:" FontSize="14" Margin="0,20,0,5"/>
+
+                <!-- Notification Settings -->
+                <CheckBox x:Name="showRecordingOverlayCheck"
+                          Content="Show overlay during recording">
+                    <CheckBox.ToolTip>
+                        <TextBlock Text="Display an overlay window with device and provider info while recording"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="300"/>
+                    </CheckBox.ToolTip>
+                </CheckBox>
                 <CheckBox x:Name="showNotificationsCheck"
-                          Content="Show notifications"/>
+                          Content="Show notification when transcription completes"
+                          Margin="0,5,0,10">
+                    <CheckBox.ToolTip>
+                        <TextBlock Text="Display a notification bubble with the transcription result and language detected"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="300"/>
+                    </CheckBox.ToolTip>
+                </CheckBox>
+
+                <!-- Text Injection Settings -->
                 <CheckBox x:Name="injectTextCheck"
                           Content="Automatically inject text into active window"/>
                 <CheckBox x:Name="fallbackClipboardCheck"
                           Content="Fallback to clipboard if text injection fails"
-                          Margin="20,5,0,0"/>
+                          Margin="20,5,0,10"/>
+
+                <!-- Hardware Integration -->
                 <CheckBox x:Name="enableSpeechMikeCheck"
                           Content="Enable SpeechMike integration"/>
             </StackPanel>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using NAudio.Wave;
 using SpeechToTextTray.Core.Models;
 
@@ -16,6 +17,8 @@ namespace SpeechToTextTray.Core.Services
         private string? _currentFilePath;
         private DateTime _recordingStartTime;
         private string _currentDeviceId = "default";
+        private TaskCompletionSource<bool>? _recordingStopCompletion;
+        private bool _isFirstDataCallback;
 
         /// <summary>
         /// Sample rate required by the backend (16kHz)
@@ -31,6 +34,11 @@ namespace SpeechToTextTray.Core.Services
         /// Event fired when audio level changes (for visual feedback)
         /// </summary>
         public event EventHandler<float>? AudioLevelChanged;
+
+        /// <summary>
+        /// Event fired when audio capture has actually started (first audio data received)
+        /// </summary>
+        public event EventHandler? CaptureStarted;
 
         /// <summary>
         /// Gets whether recording is currently in progress
@@ -189,8 +197,19 @@ namespace SpeechToTextTray.Core.Services
         /// </summary>
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
+            // Fire CaptureStarted event on first audio data received
+            if (_isFirstDataCallback && e.BytesRecorded > 0)
+            {
+                _isFirstDataCallback = false;
+                CaptureStarted?.Invoke(this, EventArgs.Empty);
+            }
+
             // Write to file
             _writer?.Write(e.Buffer, 0, e.BytesRecorded);
+
+            // CRITICAL: Flush to ensure data is written to disk immediately
+            // This updates WAV headers and prevents data loss at end of recording
+            _writer?.Flush();
 
             // Calculate audio level for visualization
             float level = CalculateLevel(e.Buffer, e.BytesRecorded);
@@ -199,6 +218,7 @@ namespace SpeechToTextTray.Core.Services
 
         /// <summary>
         /// Handle recording stopped event
+        /// This is called after all buffered audio data has been written
         /// </summary>
         private void OnRecordingStopped(object? sender, StoppedEventArgs e)
         {
@@ -206,6 +226,24 @@ namespace SpeechToTextTray.Core.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Recording error: {e.Exception.Message}");
             }
+
+            // Log final recording stats before disposal
+            if (_writer != null)
+            {
+                var fileSize = _writer.Length;
+                var duration = _writer.TotalTime;
+                System.Diagnostics.Debug.WriteLine($"Recording completed: {fileSize} bytes, {duration.TotalSeconds:F2}s");
+            }
+
+            // Now it's safe to dispose the writer - all buffered data has been written
+            // Dispose() automatically calls Close() and finalizes WAV headers
+            _writer?.Dispose();
+            _writer = null;
+
+            IsRecording = false;
+
+            // Signal that recording is fully stopped and file is finalized
+            _recordingStopCompletion?.TrySetResult(true);
         }
 
         /// <summary>
@@ -220,6 +258,12 @@ namespace SpeechToTextTray.Core.Services
             if (_waveIn == null)
                 throw new InvalidOperationException("Audio device not initialized. Call Initialize() first.");
 
+            // Create completion source for stop operation
+            _recordingStopCompletion = new TaskCompletionSource<bool>();
+
+            // Initialize flag to detect first audio data callback
+            _isFirstDataCallback = true;
+
             // Create WAV file writer (fast operation)
             _writer = new WaveFileWriter(outputPath, _waveIn.WaveFormat);
             _currentFilePath = outputPath;
@@ -231,21 +275,34 @@ namespace SpeechToTextTray.Core.Services
         }
 
         /// <summary>
-        /// Stop recording and finalize the WAV file
+        /// Stop recording and finalize the WAV file asynchronously.
+        /// Waits for all buffered audio data to be written before returning.
         /// </summary>
-        public void StopRecording()
+        /// <returns>Task that completes when the file is fully written and finalized</returns>
+        public async Task StopRecordingAsync()
         {
             if (!IsRecording)
                 return;
 
             // Stop recording (but keep device open for next recording)
+            // This is asynchronous - RecordingStopped event will fire when done
             _waveIn?.StopRecording();
 
-            // Dispose writer
-            _writer?.Dispose();
-            _writer = null!;
+            // Wait for recording to fully stop and file to be finalized
+            // The OnRecordingStopped event handler will dispose the writer and signal completion
+            if (_recordingStopCompletion != null)
+            {
+                await _recordingStopCompletion.Task;
+            }
+        }
 
-            IsRecording = false;
+        /// <summary>
+        /// Stop recording and finalize the WAV file (synchronous wrapper).
+        /// For backward compatibility. Prefer StopRecordingAsync() for better async support.
+        /// </summary>
+        public void StopRecording()
+        {
+            StopRecordingAsync().GetAwaiter().GetResult();
         }
 
         /// <summary>

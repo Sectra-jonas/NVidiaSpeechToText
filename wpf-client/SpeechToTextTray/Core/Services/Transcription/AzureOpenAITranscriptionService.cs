@@ -11,8 +11,8 @@ using SpeechToTextTray.Utils;
 namespace SpeechToTextTray.Core.Services.Transcription
 {
     /// <summary>
-    /// Azure OpenAI Whisper transcription service
-    /// Supports excellent English transcription and translation to English from other languages
+    /// Azure OpenAI transcription service
+    /// Supports audio transcription using various Azure OpenAI models
     /// </summary>
     public class AzureOpenAITranscriptionService : ITranscriptionService
     {
@@ -21,7 +21,7 @@ namespace SpeechToTextTray.Core.Services.Transcription
         private readonly AudioClient _audioClient;
         private bool _disposed = false;
 
-        // Azure OpenAI Whisper limitations
+        // Azure OpenAI audio limitations
         private const long MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
         private static readonly string[] SUPPORTED_FORMATS = { ".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm" };
 
@@ -79,14 +79,14 @@ namespace SpeechToTextTray.Core.Services.Transcription
                 var fileInfo = new FileInfo(audioFilePath);
                 if (fileInfo.Length > MAX_FILE_SIZE_BYTES)
                 {
-                    throw new InvalidOperationException($"Audio file size ({fileInfo.Length / 1024 / 1024}MB) exceeds Azure OpenAI Whisper limit of 25MB");
+                    throw new InvalidOperationException($"Audio file size ({fileInfo.Length / 1024 / 1024}MB) exceeds Azure OpenAI audio limit of 25MB");
                 }
 
                 // Validate file format
                 var extension = Path.GetExtension(audioFilePath).ToLower();
                 if (Array.IndexOf(SUPPORTED_FORMATS, extension) == -1)
                 {
-                    throw new InvalidOperationException($"Audio format '{extension}' is not supported by Azure OpenAI Whisper. Supported formats: {string.Join(", ", SUPPORTED_FORMATS)}");
+                    throw new InvalidOperationException($"Audio format '{extension}' is not supported by Azure OpenAI audio API. Supported formats: {string.Join(", ", SUPPORTED_FORMATS)}");
                 }
 
                 // Perform transcription
@@ -114,13 +114,13 @@ namespace SpeechToTextTray.Core.Services.Transcription
             string originalFilename,
             CancellationToken cancellationToken)
         {
-            Logger.Info($"Transcribing audio with Azure OpenAI Whisper: {audioFilePath}");
+            Logger.Info($"Transcribing audio with Azure OpenAI audio API: {audioFilePath}");
 
             try
             {
                 // Prepare transcription options
-                // Use Simple format for compatibility with both Whisper and gpt-4o-transcribe models
-                // Note: gpt-4o-transcribe does NOT support Verbose format
+                // Use Simple format for broad compatibility across Azure OpenAI models
+                // Note: Some models like gpt-4o-transcribe do NOT support Verbose format
                 var options = new AudioTranscriptionOptions
                 {
                     ResponseFormat = AudioTranscriptionFormat.Simple
@@ -141,7 +141,7 @@ namespace SpeechToTextTray.Core.Services.Transcription
                 // Open audio file stream
                 using var audioStream = File.OpenRead(audioFilePath);
 
-                // Call Azure OpenAI Whisper API
+                // Call Azure OpenAI audio transcription API
                 var result = await _audioClient.TranscribeAudioAsync(audioStream, originalFilename, options, cancellationToken);
 
                 // Extract transcription details
@@ -200,13 +200,13 @@ namespace SpeechToTextTray.Core.Services.Transcription
             return new TranscriptionProviderInfo
             {
                 Provider = TranscriptionProvider.AzureOpenAI,
-                ProviderName = "Azure OpenAI Whisper",
+                ProviderName = $"Azure OpenAI ({_config.DeploymentName})",
                 Version = "Azure.AI.OpenAI 2.1.0",
                 Status = IsAvailable() ? "Ready" : "Unavailable (check network)",
                 RequiresNetwork = true,
                 RequiresCredentials = true,
-                SupportedLanguages = new[] { "Optimized for English, supports 50+ languages with translation to English" },
-                Description = "OpenAI's Whisper model hosted on Azure for excellent transcription quality"
+                SupportedLanguages = new[] { "Supports 50+ languages depending on deployed model" },
+                Description = $"Azure OpenAI transcription using deployment: {_config.DeploymentName}"
             };
         }
 

@@ -42,6 +42,21 @@ namespace SpeechToTextTray.Core.Models
         public bool EnableSpeechMike { get; set; } = false;
 
         /// <summary>
+        /// Whether to show recording overlay window during recording
+        /// </summary>
+        public bool ShowRecordingOverlay { get; set; } = true;
+
+        /// <summary>
+        /// Saved X position of recording overlay (null = default position)
+        /// </summary>
+        public double? RecordingOverlayX { get; set; } = null;
+
+        /// <summary>
+        /// Saved Y position of recording overlay (null = default position)
+        /// </summary>
+        public double? RecordingOverlayY { get; set; } = null;
+
+        /// <summary>
         /// Transcription provider settings
         /// </summary>
         public TranscriptionConfig Transcription { get; set; } = new TranscriptionConfig();

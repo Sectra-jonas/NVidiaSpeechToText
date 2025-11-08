@@ -27,6 +27,7 @@ namespace SpeechToTextTray
         private TempFileManager _tempFileManager = null!;
         private NotificationHelper _notificationHelper = null!;
         private SpeechMikeService? _speechMikeService;
+        private RecordingOverlayWindow? _overlayWindow;
 
         // State
         private AppSettings _settings = null!;
@@ -136,6 +137,9 @@ namespace SpeechToTextTray
 
             Logger.Info($"Audio device initialized: {actualDeviceId}");
 
+            // Subscribe to audio capture events
+            _audioService.CaptureStarted += OnCaptureStarted;
+
             // Subscribe to hotkey events
             _hotkeyService.HotkeyPressed += OnHotkeyPressed;
 
@@ -154,6 +158,10 @@ namespace SpeechToTextTray
                     Logger.Warning("SpeechMike enabled in settings but device not available");
                 }
             }
+
+            // Initialize recording overlay window
+            _overlayWindow = new RecordingOverlayWindow(_settingsService);
+            Logger.Info("Recording overlay window initialized");
 
             Logger.Info($"Services initialized ({_settings.Transcription.Provider} transcription)");
         }
@@ -222,6 +230,44 @@ namespace SpeechToTextTray
             catch (Exception ex)
             {
                 Logger.Error("Hotkey handler error", ex);
+            }
+        }
+
+        private void OnCaptureStarted(object? sender, EventArgs e)
+        {
+            try
+            {
+                // Audio events come from background thread - marshal to UI thread
+                Dispatcher.Invoke(() =>
+                {
+                    Logger.Info("Audio capture started - showing indicators");
+
+                    // Update tray icon to show recording state
+                    _trayIcon?.SetState(RecordingState.Recording);
+
+                    // Turn on SpeechMike LED indicator
+                    _speechMikeService?.SetRecordingIndicator(true);
+
+                    // Show recording overlay
+                    if (_settings.ShowRecordingOverlay && _overlayWindow != null)
+                    {
+                        // Get current device and provider info
+                        var devices = _audioService.GetAvailableDevices();
+                        var device = devices.FirstOrDefault(d => d.Id == _settings.AudioDeviceId);
+                        var providerInfo = _transcriptionService.GetProviderInfo();
+
+                        // Update and show overlay
+                        _overlayWindow.UpdateInfo(
+                            device?.Name ?? "Unknown Device",
+                            providerInfo.ProviderName
+                        );
+                        _overlayWindow.ShowAtPosition(_settings.RecordingOverlayX, _settings.RecordingOverlayY);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("CaptureStarted handler error", ex);
             }
         }
 
@@ -317,17 +363,15 @@ namespace SpeechToTextTray
         {
             Logger.Info("Starting recording...");
 
-            // Update state
+            // Update internal state
             _currentState = RecordingState.Recording;
-            _trayIcon?.SetState(RecordingState.Recording);
-
-            // Turn on SpeechMike LED indicator
-            _speechMikeService?.SetRecordingIndicator(true);
 
             // Create temp file
             _currentRecordingPath = _tempFileManager.CreateTempFilePath();
 
-            // Start recording (device already initialized, starts immediately)
+            // Start recording (device already initialized)
+            // Visual indicators (tray icon, SpeechMike LED, overlay) will be shown
+            // when OnCaptureStarted event fires (~50ms later when audio actually starts)
             _audioService.StartRecording(_currentRecordingPath);
 
             Logger.Info($"Recording started: {_currentRecordingPath}");
@@ -337,8 +381,10 @@ namespace SpeechToTextTray
         {
             Logger.Info("Stopping recording...");
 
-            // Stop recording
-            _audioService.StopRecording();
+            // Stop recording and wait for file to be fully written
+            await _audioService.StopRecordingAsync();
+
+            // File is now guaranteed to be finalized and ready for transcription
 
             // Update state
             _currentState = RecordingState.Processing;
@@ -433,6 +479,9 @@ namespace SpeechToTextTray
 
                 // Turn off SpeechMike LED indicator
                 _speechMikeService?.SetRecordingIndicator(false);
+
+                // Hide recording overlay
+                _overlayWindow?.Hide();
 
                 // Reset to idle
                 _currentState = RecordingState.Idle;
@@ -591,7 +640,7 @@ namespace SpeechToTextTray
                 "A Windows tray application for speech-to-text transcription with multiple provider options:\n" +
                 "• Local (NVIDIA Parakeet via sherpa-onnx)\n" +
                 "• Azure Speech Service\n" +
-                "• Azure OpenAI Whisper\n\n" +
+                "• Azure OpenAI\n\n" +
                 "Features:\n" +
                 "• Configurable hotkey for recording\n" +
                 "• Optional Philips SpeechMike integration\n" +
@@ -626,11 +675,19 @@ namespace SpeechToTextTray
         {
             Logger.Info("Application shutting down...");
 
+            // Unsubscribe from events
+            if (_audioService != null)
+            {
+                _audioService.CaptureStarted -= OnCaptureStarted;
+            }
+
             // Cleanup
             _hotkeyService?.Dispose();
             _audioService?.Dispose();
             _transcriptionService?.Dispose();
             _speechMikeService?.Dispose();
+            _overlayWindow?.Close();
+            _overlayWindow = null;
             _trayIcon?.Dispose();
             _stateLock?.Dispose();
 

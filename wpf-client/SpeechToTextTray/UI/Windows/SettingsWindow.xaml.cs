@@ -52,6 +52,7 @@ namespace SpeechToTextTray.UI.Windows
             injectTextCheck.IsChecked = _currentSettings.InjectTextAutomatically;
             fallbackClipboardCheck.IsChecked = _currentSettings.FallbackToClipboard;
             enableSpeechMikeCheck.IsChecked = _currentSettings.EnableSpeechMike;
+            showRecordingOverlayCheck.IsChecked = _currentSettings.ShowRecordingOverlay;
 
             // Enable/disable fallback option based on inject text option
             fallbackClipboardCheck.IsEnabled = injectTextCheck.IsChecked ?? false;
@@ -208,6 +209,9 @@ namespace SpeechToTextTray.UI.Windows
                     InjectTextAutomatically = injectTextCheck.IsChecked ?? true,
                     FallbackToClipboard = fallbackClipboardCheck.IsChecked ?? true,
                     EnableSpeechMike = enableSpeechMikeCheck.IsChecked ?? false,
+                    ShowRecordingOverlay = showRecordingOverlayCheck.IsChecked ?? true,
+                    RecordingOverlayX = _currentSettings.RecordingOverlayX, // Preserve position
+                    RecordingOverlayY = _currentSettings.RecordingOverlayY,
                     Transcription = new TranscriptionConfig
                     {
                         Provider = _selectedProvider,
@@ -443,7 +447,7 @@ namespace SpeechToTextTray.UI.Windows
                         azureOpenAIStatusText.Text = "Connection successful";
                         azureOpenAIStatusIndicator.Fill = new SolidColorBrush(Colors.Green);
                         MessageBox.Show(
-                            "Azure OpenAI Whisper connection successful!",
+                            "Azure OpenAI connection successful!",
                             "Test Connection",
                             MessageBoxButton.OK,
                             MessageBoxImage.Information);
